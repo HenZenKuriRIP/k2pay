@@ -68,7 +68,8 @@
     "withdrawAddresses": "Địa chỉ rút tiền",
     "appVersions": "Phiên bản ứng dụng",
     "settings": "Cài đặt",
-    "chains": "Giám sát chuỗi"
+    "chains": "Giám sát chuỗi",
+    "paymentMethods": "Phương thức thanh toán"
   },
   "dashboard": {
     "todayOrders": "Đơn hàng hôm nay",

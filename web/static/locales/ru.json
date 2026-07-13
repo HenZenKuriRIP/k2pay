@@ -68,7 +68,8 @@
     "withdrawAddresses": "Адреса вывода",
     "appVersions": "Версии приложения",
     "settings": "Настройки",
-    "chains": "Мониторинг сетей"
+    "chains": "Мониторинг сетей",
+    "paymentMethods": "Способы оплаты"
   },
   "dashboard": {
     "todayOrders": "Заказы сегодня",

@@ -68,7 +68,8 @@
     "withdrawAddresses": "ထုတ်ယူရန်လိပ်စာ",
     "appVersions": "အက်ပ်ဗားရှင်း",
     "settings": "ဆက်တင်များ",
-    "chains": "ချိန်းစောင့်ကြည့်"
+    "chains": "ချိန်းစောင့်ကြည့်",
+    "paymentMethods": "ငွေပေးချေမှုနည်းလမ်း"
   },
   "dashboard": {
     "todayOrders": "ယနေ့အော်ဒါ",

@@ -341,6 +341,7 @@
                 <a class="menu-item" data-page="withdrawals"><span class="menu-icon"><i class="fas fa-money-bill-transfer"></i></span><span data-i18n="admin.withdrawals">提现管理</span></a>
                 <a class="menu-item" data-page="withdraw-addresses"><span class="menu-icon"><i class="fas fa-address-card"></i></span><span data-i18n="admin.withdrawAddresses">提现地址审核</span></a>
                 <a class="menu-item" data-page="app-versions"><span class="menu-icon"><i class="fas fa-mobile-alt"></i></span><span data-i18n="admin.appVersions">APP版本</span></a>
+                <a class="menu-item" data-page="payment-methods"><span class="menu-icon"><i class="fas fa-credit-card"></i></span><span data-i18n="admin.paymentMethods">支付方式</span></a>
                 <a class="menu-item" data-page="settings"><span class="menu-icon"><i class="fas fa-cog"></i></span><span data-i18n="admin.settings">系统设置</span></a>
                 <a class="menu-item" data-page="password"><span class="menu-icon"><i class="fas fa-key"></i></span><span data-i18n="auth.changePassword">修改密码</span></a>
             </nav>
@@ -730,88 +731,17 @@
             </div>
 
             <!-- Settings Page -->
-            <div class="page" id="page-settings">
+
+            <!-- Payment Methods Page -->
+            <div class="page" id="page-payment-methods">
                 <div class="card">
                     <div class="card-header">
-                        <h2 data-i18n="settings.title">系统设置</h2>
+                        <h2 data-i18n="admin.paymentMethods">支付方式</h2>
                     </div>
                     <div class="card-body settings-section">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label data-i18n="settings.orderExpire">订单过期时间(分钟)</label>
-                                <input type="text" id="cfg_order_expire">
-                            </div>
-                            <div class="form-group">
-                                <label data-i18n="settings.notifyRetry">通知重试次数</label>
-                                <input type="text" id="cfg_notify_retry">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label data-i18n="adminPage.settings.systemWalletFeeRate">系统收款码手续费率</label>
-                                <input type="text" id="cfg_system_wallet_fee_rate" data-i18n-placeholder="adminPage.settings.feeRatePlaceholder">
-                                <small class="form-hint" data-i18n="adminPage.settings.systemWalletFeeRateDesc">使用系统钱包收款时的手续费率，收款金额扣除手续费后入商户余额</small>
-                            </div>
-                            <div class="form-group">
-                                <label data-i18n="adminPage.settings.personalWalletFeeRate">个人收款码手续费率</label>
-                                <input type="text" id="cfg_personal_wallet_fee_rate" data-i18n-placeholder="adminPage.settings.feeRatePlaceholder">
-                                <small class="form-hint" data-i18n="adminPage.settings.personalWalletFeeRateDesc">使用个人钱包收款时的手续费率，收款直接到商户账户，手续费从余额扣除</small>
-                            </div>
-                        </div>
-
-                        <h3 data-i18n="adminPage.settings.telegramBotSettings">Telegram 机器人设置</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>启用 Telegram 服务</label>
-                                <select id="cfg_telegram_enabled">
-                                    <option value="0">禁用</option>
-                                    <option value="1">启用</option>
-                                </select>
-                                <small style="color:#666;font-size:12px;">全局开关，禁用后 Telegram 服务将停止运行</small>
-                            </div>
-                            <div class="form-group">
-                                <label>接收模式</label>
-                                <select id="cfg_telegram_mode" onchange="toggleWebhookUrl()">
-                                    <option value="polling">轮询模式 (Polling)</option>
-                                    <option value="webhook">推送模式 (Webhook)</option>
-                                </select>
-                                <small style="color:#666;font-size:12px;">轮询模式适合开发环境，推送模式适合生产环境（需要HTTPS）</small>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label data-i18n="settings.botToken">Bot Token</label>
-                                <input type="text" id="cfg_telegram_bot_token" data-i18n-placeholder="adminPage.settings.botTokenPlaceholder">
-                                <small style="color:#666;font-size:12px;" data-i18n="adminPage.settings.botTokenDesc">在 Telegram 中搜索 @BotFather，发送 /newbot 创建机器人获取 Token</small>
-                            </div>
-                            <div class="form-group">
-                                <label data-i18n="adminPage.settings.botUsername">Bot 用户名</label>
-                                <input type="text" id="cfg_telegram_bot_username" data-i18n-placeholder="adminPage.settings.botUsernamePlaceholder">
-                                <small style="color:#666;font-size:12px;" data-i18n="adminPage.settings.botUsernameDesc">机器人的用户名，方便商户查找绑定 (包含@符号)</small>
-                            </div>
-                        </div>
-                        <div class="form-row" id="webhook_url_row" style="display:none;">
-                            <div class="form-group" style="flex:1;">
-                                <label>Webhook URL (可选)</label>
-                                <input type="text" id="cfg_telegram_webhook_url" placeholder="留空自动生成，例如: https://yourdomain.com/telegram/webhook">
-                                <small style="color:#666;font-size:12px;">留空系统将根据服务器配置自动生成 Webhook 地址</small>
-                            </div>
-                        </div>
-                        <div class="form-row" id="webhook_secret_row" style="display:none;">
-                            <div class="form-group" style="flex:1;">
-                                <label>Webhook Secret</label>
-                                <div style="display:flex;gap:8px;">
-                                    <input type="text" id="cfg_telegram_webhook_secret" placeholder="点击生成按钮自动生成" style="flex:1;">
-                                    <button type="button" class="btn" style="background:#17a2b8;color:white;white-space:nowrap;" onclick="generateWebhookSecret()">生成</button>
-                                </div>
-                                <small style="color:#666;font-size:12px;">用于验证 Telegram 推送请求的合法性，防止伪造请求</small>
-                            </div>
-                        </div>
-                        <div id="telegramStatus" style="margin-bottom:16px;padding:12px;border-radius:8px;background:#f5f5f5;display:none;">
-                            <span id="telegramStatusIcon"></span>
-                            <span id="telegramStatusText"></span>
-                        </div>
-
+                        <p style="color:var(--text-2);font-size:13px;margin-bottom:20px;line-height:1.6;">
+                            配置官方支付宝 / 微信商户接口。模式为「官方」时走开放平台；未配置或失败时自动回退个人收款码。
+                        </p>
                         <h3>官方支付 · 支付宝商户</h3>
                         <div style="background:var(--primary-soft);border:1px solid #bfdbfe;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--text-2);line-height:1.6;">
                             <strong style="color:var(--primary);">接入说明</strong>：将支付宝开放平台「当面付 / 预下单 alipay.trade.precreate」接入本系统。
@@ -913,6 +843,91 @@
 
                         <div class="btn-group" style="margin-bottom:20px;">
                             <button type="button" class="btn btn-success" onclick="saveOfficialPay()">保存官方支付配置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page" id="page-settings">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 data-i18n="settings.title">系统设置</h2>
+                    </div>
+                    <div class="card-body settings-section">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-i18n="settings.orderExpire">订单过期时间(分钟)</label>
+                                <input type="text" id="cfg_order_expire">
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="settings.notifyRetry">通知重试次数</label>
+                                <input type="text" id="cfg_notify_retry">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-i18n="adminPage.settings.systemWalletFeeRate">系统收款码手续费率</label>
+                                <input type="text" id="cfg_system_wallet_fee_rate" data-i18n-placeholder="adminPage.settings.feeRatePlaceholder">
+                                <small class="form-hint" data-i18n="adminPage.settings.systemWalletFeeRateDesc">使用系统钱包收款时的手续费率，收款金额扣除手续费后入商户余额</small>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="adminPage.settings.personalWalletFeeRate">个人收款码手续费率</label>
+                                <input type="text" id="cfg_personal_wallet_fee_rate" data-i18n-placeholder="adminPage.settings.feeRatePlaceholder">
+                                <small class="form-hint" data-i18n="adminPage.settings.personalWalletFeeRateDesc">使用个人钱包收款时的手续费率，收款直接到商户账户，手续费从余额扣除</small>
+                            </div>
+                        </div>
+
+                        <h3 data-i18n="adminPage.settings.telegramBotSettings">Telegram 机器人设置</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>启用 Telegram 服务</label>
+                                <select id="cfg_telegram_enabled">
+                                    <option value="0">禁用</option>
+                                    <option value="1">启用</option>
+                                </select>
+                                <small style="color:#666;font-size:12px;">全局开关，禁用后 Telegram 服务将停止运行</small>
+                            </div>
+                            <div class="form-group">
+                                <label>接收模式</label>
+                                <select id="cfg_telegram_mode" onchange="toggleWebhookUrl()">
+                                    <option value="polling">轮询模式 (Polling)</option>
+                                    <option value="webhook">推送模式 (Webhook)</option>
+                                </select>
+                                <small style="color:#666;font-size:12px;">轮询模式适合开发环境，推送模式适合生产环境（需要HTTPS）</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label data-i18n="settings.botToken">Bot Token</label>
+                                <input type="text" id="cfg_telegram_bot_token" data-i18n-placeholder="adminPage.settings.botTokenPlaceholder">
+                                <small style="color:#666;font-size:12px;" data-i18n="adminPage.settings.botTokenDesc">在 Telegram 中搜索 @BotFather，发送 /newbot 创建机器人获取 Token</small>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="adminPage.settings.botUsername">Bot 用户名</label>
+                                <input type="text" id="cfg_telegram_bot_username" data-i18n-placeholder="adminPage.settings.botUsernamePlaceholder">
+                                <small style="color:#666;font-size:12px;" data-i18n="adminPage.settings.botUsernameDesc">机器人的用户名，方便商户查找绑定 (包含@符号)</small>
+                            </div>
+                        </div>
+                        <div class="form-row" id="webhook_url_row" style="display:none;">
+                            <div class="form-group" style="flex:1;">
+                                <label>Webhook URL (可选)</label>
+                                <input type="text" id="cfg_telegram_webhook_url" placeholder="留空自动生成，例如: https://yourdomain.com/telegram/webhook">
+                                <small style="color:#666;font-size:12px;">留空系统将根据服务器配置自动生成 Webhook 地址</small>
+                            </div>
+                        </div>
+                        <div class="form-row" id="webhook_secret_row" style="display:none;">
+                            <div class="form-group" style="flex:1;">
+                                <label>Webhook Secret</label>
+                                <div style="display:flex;gap:8px;">
+                                    <input type="text" id="cfg_telegram_webhook_secret" placeholder="点击生成按钮自动生成" style="flex:1;">
+                                    <button type="button" class="btn" style="background:#17a2b8;color:white;white-space:nowrap;" onclick="generateWebhookSecret()">生成</button>
+                                </div>
+                                <small style="color:#666;font-size:12px;">用于验证 Telegram 推送请求的合法性，防止伪造请求</small>
+                            </div>
+                        </div>
+                        <div id="telegramStatus" style="margin-bottom:16px;padding:12px;border-radius:8px;background:#f5f5f5;display:none;">
+                            <span id="telegramStatusIcon"></span>
+                            <span id="telegramStatusText"></span>
                         </div>
 
                         <h3 style="margin-top:24px;margin-bottom:16px;color:#333;border-bottom:1px solid #eee;padding-bottom:8px;" data-i18n="adminPage.settings.customerServiceSettings">客服链接设置</h3>
@@ -1254,6 +1269,7 @@
                     if (page === 'withdrawals') loadWithdrawals();
                     if (page === 'withdraw-addresses') loadWithdrawAddresses();
                     if (page === 'app-versions') loadAppVersions();
+                    if (page === 'payment-methods') loadOfficialPay();
                     if (page === 'settings') loadSettings();
                 });
             });
@@ -2210,7 +2226,6 @@
                 // 显示/隐藏 webhook URL 输入框
                 toggleWebhookUrl();
             }
-            loadOfficialPay();
         }
 
         async function loadOfficialPay() {
@@ -2278,8 +2293,7 @@
             const data = await api('/admin/api/official-pay', { method: 'POST', body: JSON.stringify(body) });
             if (data.code === 1) {
                 showToast('官方支付配置已保存');
-                loadOfficialPay();
-            } else {
+                } else {
                 showToast(data.msg || '保存失败', 'error');
             }
         }
@@ -3560,6 +3574,7 @@
             'withdrawals': 'admin.withdrawals',
             'withdraw-addresses': 'admin.withdrawAddresses',
             'app-versions': 'admin.appVersions',
+            'payment-methods': 'admin.paymentMethods',
             'settings': 'admin.settings',
             'password': 'auth.changePassword'
         };

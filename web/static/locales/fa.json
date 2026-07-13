@@ -68,7 +68,8 @@
     "withdrawAddresses": "آدرس‌های برداشت",
     "appVersions": "نسخه‌های برنامه",
     "settings": "تنظیمات",
-    "chains": "مانیتورینگ زنجیره"
+    "chains": "مانیتورینگ زنجیره",
+    "paymentMethods": "روش‌های پرداخت"
   },
   "dashboard": {
     "todayOrders": "سفارشات امروز",

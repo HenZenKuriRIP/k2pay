@@ -69,7 +69,8 @@
     "appVersions": "APP版本",
     "settings": "系统设置",
     "chains": "链监控",
-    "blockchainStatus": "区块链监听状态"
+    "blockchainStatus": "区块链监听状态",
+    "paymentMethods": "支付方式"
   },
   "adminPage": {
     "modal": {

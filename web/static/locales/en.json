@@ -69,7 +69,8 @@
     "appVersions": "App Versions",
     "settings": "Settings",
     "chains": "Chain Monitor",
-    "blockchainStatus": "Blockchain Monitor Status"
+    "blockchainStatus": "Blockchain Monitor Status",
+    "paymentMethods": "Payment Methods"
   },
   "adminPage": {
     "modal": {

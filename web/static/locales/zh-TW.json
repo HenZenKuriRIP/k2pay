@@ -68,7 +68,8 @@
     "withdrawAddresses": "提現地址審核",
     "appVersions": "APP版本",
     "settings": "系統設定",
-    "chains": "鏈監控"
+    "chains": "鏈監控",
+    "paymentMethods": "支付方式"
   },
   "dashboard": {
     "todayOrders": "今日訂單",
