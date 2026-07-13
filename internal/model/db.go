@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -22,10 +22,10 @@ type DBConfig struct {
 
 // DefaultDBConfig 默认数据库配置
 var DefaultDBConfig = DBConfig{
-	MaxOpenConns:    100,              // 最大100个连接
-	MaxIdleConns:    10,               // 最大10个空闲连接
-	ConnMaxLifetime: time.Hour,        // 连接最长1小时
-	ConnMaxIdleTime: 10 * time.Minute, // 空闲连接最长10分钟
+	MaxOpenConns:    100,
+	MaxIdleConns:    10,
+	ConnMaxLifetime: time.Hour,
+	ConnMaxIdleTime: 10 * time.Minute,
 }
 
 // InitDB 初始化数据库连接
@@ -33,17 +33,17 @@ func InitDB(dsn string) error {
 	return InitDBWithConfig(dsn, DefaultDBConfig)
 }
 
-// InitDBWithConfig 使用自定义配置初始化数据库连接
+// InitDBWithConfig 使用自定义配置初始化数据库连接（PostgreSQL）
 func InitDBWithConfig(dsn string, cfg DBConfig) error {
 	var err error
-	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn), // 生产环境使用 Warn 级别
+	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger:                                   logger.Default.LogMode(logger.Warn),
+		DisableForeignKeyConstraintWhenMigrating: false,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect database: %w", err)
 	}
 
-	// 配置连接池
 	sqlDB, err := DB.DB()
 	if err != nil {
 		return fmt.Errorf("failed to get underlying sql.DB: %w", err)
@@ -54,22 +54,19 @@ func InitDBWithConfig(dsn string, cfg DBConfig) error {
 	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 	sqlDB.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
-	// 验证连接
 	if err := sqlDB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// 自动迁移
 	if err := autoMigrate(); err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
-	// 初始化默认数据
 	if err := initDefaultData(); err != nil {
 		return fmt.Errorf("failed to init default data: %w", err)
 	}
 
-	log.Printf("Database connected (MaxOpen: %d, MaxIdle: %d)", cfg.MaxOpenConns, cfg.MaxIdleConns)
+	log.Printf("PostgreSQL connected (MaxOpen: %d, MaxIdle: %d)", cfg.MaxOpenConns, cfg.MaxIdleConns)
 	return nil
 }
 
@@ -107,6 +104,11 @@ func CheckDBHealth() error {
 	return sqlDB.Ping()
 }
 
+// GetDB 获取数据库实例
+func GetDB() *gorm.DB {
+	return DB
+}
+
 // autoMigrate 自动迁移表结构
 func autoMigrate() error {
 	return DB.AutoMigrate(
@@ -130,13 +132,10 @@ func autoMigrate() error {
 
 // initDefaultData 初始化默认数据
 func initDefaultData() error {
-	// 初始化系统商户(id=0)
-	// 仅用于 wallets 表外键约束，不参与商户管理/登录/统计
-	// 清理历史脏数据：p_id=SYSTEM 但 id!=0 的重复记录（常见于 AUTO_INCREMENT 把 0 变成了自增值）
+	// 系统商户 id=0：仅用于 wallets 外键，不出现在商户列表
 	var dupSystemIDs []uint
 	DB.Model(&Merchant{}).Where("p_id = ? AND id != 0", "SYSTEM").Pluck("id", &dupSystemIDs)
 	if len(dupSystemIDs) > 0 {
-		// 先把误挂到重复系统商户上的钱包归并到 id=0
 		if err := DB.Model(&Wallet{}).Where("merchant_id IN ?", dupSystemIDs).Update("merchant_id", 0).Error; err != nil {
 			log.Printf("Warning: reassign wallets from duplicate SYSTEM merchants: %v", err)
 		}
@@ -149,24 +148,28 @@ func initDefaultData() error {
 
 	var systemMerchant Merchant
 	if err := DB.Where("id = ?", 0).First(&systemMerchant).Error; err != nil {
-		// 使用 NO_AUTO_VALUE_ON_ZERO 模式允许插入 id=0
-		// 这是MySQL官方推荐的方式来插入0到AUTO_INCREMENT列
-		DB.Exec("SET SESSION sql_mode = 'NO_AUTO_VALUE_ON_ZERO'")
-		// 确保无论后续操作是否出错都恢复 sql_mode
-		defer DB.Exec("SET SESSION sql_mode = ''")
-		result := DB.Exec(`INSERT INTO merchants (id, p_id, name, ` + "`key`" + `, password, status, created_at, updated_at)
+		// PostgreSQL: 允许显式插入 id=0，并修正序列
+		result := DB.Exec(`
+			INSERT INTO merchants (id, p_id, name, "key", password, status, created_at, updated_at)
 			VALUES (0, 'SYSTEM', '系统钱包', 'system_key', '', 1, NOW(), NOW())
-			ON DUPLICATE KEY UPDATE p_id = 'SYSTEM', name = '系统钱包'`)
+			ON CONFLICT (id) DO UPDATE SET p_id = EXCLUDED.p_id, name = EXCLUDED.name`)
 		if result.Error != nil {
-			log.Printf("Warning: Failed to create system merchant: %v", result.Error)
-		} else if result.RowsAffected > 0 {
-			log.Println("System merchant (id=0) created for global wallets")
+			// 兼容无 ON CONFLICT 目标的情况（无主键冲突时）
+			log.Printf("Warning: Failed to create system merchant (try plain insert): %v", result.Error)
+			result = DB.Exec(`
+				INSERT INTO merchants (id, p_id, name, "key", password, status, created_at, updated_at)
+				VALUES (0, 'SYSTEM', '系统钱包', 'system_key', '', 1, NOW(), NOW())`)
+			if result.Error != nil {
+				log.Printf("Warning: Failed to create system merchant: %v", result.Error)
+			}
 		} else {
-			log.Println("System merchant (id=0) already exists")
+			log.Println("System merchant (id=0) ensured for global wallets")
 		}
+		// 保证自增序列不低于 max(id)
+		_ = DB.Exec(`SELECT setval(pg_get_serial_sequence('merchants', 'id'), GREATEST(1, (SELECT COALESCE(MAX(id), 1) FROM merchants)))`)
 	}
 
-	// 初始化默认管理员
+	// 默认管理员
 	var adminCount int64
 	DB.Model(&Admin{}).Count(&adminCount)
 	correctHash := "$2a$10$xiL.DqGTWgs4Sxv99TBxOeUMySHTXe5K2LtTgvtUTNc6wdChhRd7G" // admin123
@@ -175,22 +178,20 @@ func initDefaultData() error {
 			Username:           "admin",
 			Password:           correctHash,
 			Status:             1,
-			MustChangePassword: true, // 默认弱口令，强制首次改密
+			MustChangePassword: true,
 		}
 		if err := DB.Create(&admin).Error; err != nil {
 			return err
 		}
 		log.Println("Default admin created: admin / admin123 (请立即修改!)")
 	} else {
-		// 已有管理员：若仍是内置默认弱口令哈希，标记强制改密
 		DB.Model(&Admin{}).Where("password = ? AND must_change_password = ?", correctHash, false).
 			Update("must_change_password", true)
 	}
 
-	// 初始化默认商户（排除系统内部商户 id=0）
+	// 默认商户（排除系统内部商户）
 	var merchantCount int64
 	DB.Model(&Merchant{}).Where("id > 0 AND p_id != ?", "SYSTEM").Count(&merchantCount)
-	// 默认商户密码: merchant123
 	defaultMerchantPassword := "$2a$10$ZfUDWHWqrRcGn1mFlMklLudfG4rUnmoIwqaGFMm9ZBSg9CYbLRbvC"
 	if merchantCount == 0 {
 		merchant := Merchant{
@@ -199,20 +200,17 @@ func initDefaultData() error {
 			Key:                "test_key_123456",
 			Password:           defaultMerchantPassword,
 			Status:             1,
-			MustChangePassword: true, // 默认弱口令，强制首次改密
+			MustChangePassword: true,
 		}
 		if err := DB.Create(&merchant).Error; err != nil {
 			return err
 		}
 		log.Println("Default merchant created: PID=1001, Password=merchant123 (请立即修改!)")
 	} else {
-		// 已有商户：若仍是内置默认弱口令哈希，标记强制改密
 		DB.Model(&Merchant{}).Where("password = ? AND must_change_password = ?", defaultMerchantPassword, false).
 			Update("must_change_password", true)
 	}
-	// 注意: 不再在每次启动时把空密码商户静默重置为默认密码
 
-	// 初始化系统配置
 	defaultConfigs := []SystemConfig{
 		{Key: ConfigKeyRateMode, Value: "hybrid", Description: "汇率模式: auto/manual/hybrid"},
 		{Key: ConfigKeyManualRate, Value: "7.2", Description: "手动设置的汇率"},
@@ -227,16 +225,11 @@ func initDefaultData() error {
 
 	for _, cfg := range defaultConfigs {
 		var count int64
-		DB.Model(&SystemConfig{}).Where("`key` = ?", cfg.Key).Count(&count)
+		DB.Model(&SystemConfig{}).Where(`"key" = ?`, cfg.Key).Count(&count)
 		if count == 0 {
 			DB.Create(&cfg)
 		}
 	}
 
 	return nil
-}
-
-// GetDB 获取数据库实例
-func GetDB() *gorm.DB {
-	return DB
 }

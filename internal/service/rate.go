@@ -333,7 +333,7 @@ func (s *RateService) ConvertUSDTToCNY(usdt decimal.Decimal) (decimal.Decimal, e
 // GetConfigValue 获取系统配置值（公开方法）
 func (s *RateService) GetConfigValue(key, defaultValue string) string {
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", key).First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, key).First(&config).Error; err != nil {
 		return defaultValue
 	}
 	if config.Value == "" {

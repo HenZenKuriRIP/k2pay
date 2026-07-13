@@ -302,41 +302,37 @@ func (h *MerchantHandler) Dashboard(c *gin.Context) {
 	})
 }
 
-// DashboardTrend 获取趋势数据
+// DashboardTrend 获取趋势数据（PostgreSQL）
 func (h *MerchantHandler) DashboardTrend(c *gin.Context) {
 	merchantID := c.MustGet("merchant_id").(uint)
 	period := c.DefaultQuery("period", "week")
 
 	var startDate time.Time
-	var dateFormat string
+	var selectExpr string
 	var groupBy string
 
 	now := time.Now()
 	switch period {
 	case "today":
-		// 当日按小时统计
 		startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		dateFormat = "%H:00"
-		groupBy = "HOUR(created_at)"
+		selectExpr = "to_char(created_at, 'HH24:00') as label"
+		groupBy = "to_char(created_at, 'HH24:00')"
 	case "week":
-		// 最近7天按天统计
 		startDate = now.AddDate(0, 0, -6)
-		dateFormat = "%m-%d"
-		groupBy = "DATE(created_at)"
+		selectExpr = "to_char(created_at, 'MM-DD') as label"
+		groupBy = "to_char(created_at, 'MM-DD')"
 	case "month":
-		// 最近30天按天统计
 		startDate = now.AddDate(0, 0, -29)
-		dateFormat = "%m-%d"
-		groupBy = "DATE(created_at)"
+		selectExpr = "to_char(created_at, 'MM-DD') as label"
+		groupBy = "to_char(created_at, 'MM-DD')"
 	case "3months":
-		// 最近3个月按周统计
 		startDate = now.AddDate(0, -3, 0)
-		dateFormat = "%Y-%m-%d"
-		groupBy = "YEARWEEK(created_at, 1)"
+		selectExpr = "to_char(date_trunc('week', created_at), 'YYYY-MM-DD') as label"
+		groupBy = "date_trunc('week', created_at)"
 	default:
 		startDate = now.AddDate(0, 0, -6)
-		dateFormat = "%m-%d"
-		groupBy = "DATE(created_at)"
+		selectExpr = "to_char(created_at, 'MM-DD') as label"
+		groupBy = "to_char(created_at, 'MM-DD')"
 	}
 
 	var trends []struct {
@@ -345,19 +341,12 @@ func (h *MerchantHandler) DashboardTrend(c *gin.Context) {
 		AmountUSD float64 `json:"amount_usd"`
 	}
 
-	query := model.DB.Model(&model.Order{}).
-		Where("merchant_id = ? AND status = 1 AND created_at >= ?", merchantID, startDate)
-
-	// 使用 settlement_amount 作为 USD 金额
-	if period == "today" {
-		query.Select("DATE_FORMAT(created_at, ?) as label, COUNT(*) as count, COALESCE(SUM(settlement_amount), 0) as amount_usd", dateFormat)
-	} else if period == "3months" {
-		query.Select("MIN(DATE_FORMAT(created_at, ?)) as label, COUNT(*) as count, COALESCE(SUM(settlement_amount), 0) as amount_usd", dateFormat)
-	} else {
-		query.Select("DATE_FORMAT(created_at, ?) as label, COUNT(*) as count, COALESCE(SUM(settlement_amount), 0) as amount_usd", dateFormat)
-	}
-
-	query.Group(groupBy).Order("label ASC").Scan(&trends)
+	model.DB.Model(&model.Order{}).
+		Where("merchant_id = ? AND status = 1 AND created_at >= ?", merchantID, startDate).
+		Select(selectExpr + ", COUNT(*) as count, COALESCE(SUM(settlement_amount), 0) as amount_usd").
+		Group(groupBy).
+		Order("label ASC").
+		Scan(&trends)
 
 	// 构建返回数据
 	labels := make([]string, len(trends))
@@ -942,10 +931,10 @@ func (h *MerchantHandler) GetRechargeAddresses(c *gin.Context) {
 	// 获取客服链接
 	var serviceTelegram, serviceDiscord string
 	var cfg model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", model.ConfigKeyServiceTelegram).First(&cfg).Error; err == nil {
+	if err := model.GetDB().Where(`"key" = ?`, model.ConfigKeyServiceTelegram).First(&cfg).Error; err == nil {
 		serviceTelegram = cfg.Value
 	}
-	if err := model.GetDB().Where("`key` = ?", model.ConfigKeyServiceDiscord).First(&cfg).Error; err == nil {
+	if err := model.GetDB().Where(`"key" = ?`, model.ConfigKeyServiceDiscord).First(&cfg).Error; err == nil {
 		serviceDiscord = cfg.Value
 	}
 
@@ -1055,12 +1044,12 @@ func (h *MerchantHandler) GetWalletMode(c *gin.Context) {
 	// 获取系统手续费率配置
 	var systemFeeRate, personalFeeRate string
 	var cfgSystem, cfgPersonal model.SystemConfig
-	if err := model.DB.Where("`key` = ?", model.ConfigKeySystemWalletFeeRate).First(&cfgSystem).Error; err == nil {
+	if err := model.DB.Where(`"key" = ?`, model.ConfigKeySystemWalletFeeRate).First(&cfgSystem).Error; err == nil {
 		systemFeeRate = cfgSystem.Value
 	} else {
 		systemFeeRate = "0.02"
 	}
-	if err := model.DB.Where("`key` = ?", model.ConfigKeyPersonalWalletFeeRate).First(&cfgPersonal).Error; err == nil {
+	if err := model.DB.Where(`"key" = ?`, model.ConfigKeyPersonalWalletFeeRate).First(&cfgPersonal).Error; err == nil {
 		personalFeeRate = cfgPersonal.Value
 	} else {
 		personalFeeRate = "0.01"
@@ -1207,7 +1196,7 @@ func (h *MerchantHandler) DeleteWithdrawAddress(c *gin.Context) {
 func (h *MerchantHandler) GetTelegramBotInfo(c *gin.Context) {
 	// 从系统配置获取 Bot 用户名
 	var cfg model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", "telegram_bot_username").First(&cfg).Error; err != nil || cfg.Value == "" {
+	if err := model.GetDB().Where(`"key" = ?`, "telegram_bot_username").First(&cfg).Error; err != nil || cfg.Value == "" {
 		c.JSON(http.StatusOK, gin.H{
 			"code": 1,
 			"data": gin.H{
@@ -1284,7 +1273,7 @@ func (h *MerchantHandler) GetMonitorConfig(c *gin.Context) {
 	// 获取服务器URL配置
 	var serverURL string
 	var cfg model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", "server_url").First(&cfg).Error; err == nil && cfg.Value != "" {
+	if err := model.GetDB().Where(`"key" = ?`, "server_url").First(&cfg).Error; err == nil && cfg.Value != "" {
 		serverURL = cfg.Value
 	} else {
 		// 尝试从请求中获取

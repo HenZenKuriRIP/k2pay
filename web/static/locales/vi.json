@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "EzPay",
+    "appName": "K2Pay",
     "loading": "Đang tải...",
     "confirm": "Xác nhận",
     "cancel": "Hủy",
@@ -56,7 +56,7 @@
     "invalidCredentials": "Tên đăng nhập hoặc mật khẩu không đúng"
   },
   "admin": {
-    "title": "Quản trị EzPay",
+    "title": "Quản trị K2Pay",
     "dashboard": "Bảng điều khiển",
     "merchants": "Thương nhân",
     "wallets": "Ví",
@@ -91,7 +91,7 @@
     "orderCount": "Đơn hàng"
   },
   "merchant": {
-    "title": "Thương nhân EzPay",
+    "title": "Thương nhân K2Pay",
     "pid": "ID Thương nhân",
     "name": "Tên",
     "balance": "Số dư",

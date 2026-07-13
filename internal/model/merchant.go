@@ -62,7 +62,7 @@ type Merchant struct {
 	ID                 uint           `gorm:"primaryKey" json:"id"`
 	PID                string         `gorm:"column:p_id;type:varchar(32);uniqueIndex;not null" json:"pid"`
 	Name               string         `gorm:"type:varchar(100)" json:"name"`
-	Key                string         `gorm:"type:varchar(64);not null" json:"-"`
+	Key                string         `gorm:"column:key;type:varchar(64);not null" json:"-"`
 	Password           string         `gorm:"type:varchar(100)" json:"-"` // 商户登录密码 (bcrypt)
 	MustChangePassword bool           `gorm:"default:false" json:"must_change_password"` // 强制修改密码（默认弱口令）
 	Email              string         `gorm:"type:varchar(100)" json:"email"`             // 联系邮箱

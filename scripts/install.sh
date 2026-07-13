@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # K2Pay 一键安装 / 重装
-# - 拉取二进制、MySQL、systemd
+# - 拉取二进制、PostgreSQL、systemd
 # - 清空冲突的 Nginx 站点配置后写入干净反代
 # - 若已有 Let's Encrypt 证书则直接挂载；否则自动申请
 # - 不使用 certbot --nginx（避免改写 default 导致 301 死循环）
@@ -106,10 +106,10 @@ info "安装系统依赖..."
 if [[ "$PKG" == "apt" ]]; then
   apt-get update -y
   apt-get install -y curl ca-certificates tar gzip openssl python3 file
-  if ! command -v mysql >/dev/null 2>&1; then
-    apt-get install -y mariadb-server mariadb-client || apt-get install -y mysql-server default-mysql-client
+  if ! command -v psql >/dev/null 2>&1; then
+    apt-get install -y postgresql postgresql-contrib
   fi
-  systemctl enable --now mariadb 2>/dev/null || systemctl enable --now mysql 2>/dev/null || true
+  systemctl enable --now postgresql 2>/dev/null || systemctl enable --now postgresql@* 2>/dev/null || true
   if [[ "$SKIP_NGINX" -eq 0 ]]; then
     apt-get install -y nginx
     systemctl enable --now nginx
@@ -117,8 +117,8 @@ if [[ "$PKG" == "apt" ]]; then
   fi
 else
   $PKG install -y curl tar gzip openssl python3 file
-  $PKG install -y mariadb-server 2>/dev/null || $PKG install -y mysql-server 2>/dev/null || true
-  systemctl enable --now mariadb 2>/dev/null || systemctl enable --now mysqld 2>/dev/null || true
+  $PKG install -y postgresql postgresql-contrib 2>/dev/null || $PKG install -y postgresql-server 2>/dev/null || true
+  systemctl enable --now postgresql 2>/dev/null || true
   if [[ "$SKIP_NGINX" -eq 0 ]]; then
     $PKG install -y nginx
     systemctl enable --now nginx
@@ -126,8 +126,8 @@ else
   fi
 fi
 
-# ---------- 数据库 ----------
-info "配置 MySQL/MariaDB..."
+# ---------- 数据库 (PostgreSQL) ----------
+info "配置 PostgreSQL..."
 DB_PASS=""
 if [[ -f "$CONF_DIR/db.credentials" ]]; then
   # 重装保留原数据库密码
@@ -139,19 +139,36 @@ if [[ -z "$DB_PASS" ]]; then
   DB_PASS="$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 20)"
 fi
 
-mysql_root() { mysql -uroot "$@"; }
-mysql_root -e "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" \
-  || die "无法连接 MySQL root，请先配置 root 本地登录"
-mysql_root -e "CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';" 2>/dev/null \
-  || mysql_root -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';" 2>/dev/null \
-  || mysql_root -e "SET PASSWORD FOR '${DB_USER}'@'localhost' = PASSWORD('${DB_PASS}');" 2>/dev/null \
-  || true
-mysql_root -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost'; FLUSH PRIVILEGES;"
-if ! mysql -u"${DB_USER}" -p"${DB_PASS}" -e "USE ${DB_NAME};" 2>/dev/null; then
-  mysql_root -e "DROP USER IF EXISTS '${DB_USER}'@'localhost';" 2>/dev/null || true
-  mysql_root -e "CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}'; GRANT ALL ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost'; FLUSH PRIVILEGES;"
-  mysql -u"${DB_USER}" -p"${DB_PASS}" -e "USE ${DB_NAME};" || die "数据库用户创建失败"
+pg_as_postgres() {
+  if command -v sudo >/dev/null 2>&1 && id postgres >/dev/null 2>&1; then
+    sudo -u postgres "$@"
+  else
+    "$@"
+  fi
+}
+
+# 创建角色与数据库（幂等）
+pg_as_postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 \
+  || pg_as_postgres psql -v ON_ERROR_STOP=1 -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" \
+  || die "无法创建 PostgreSQL 用户 ${DB_USER}"
+# 更新密码（重装时）
+pg_as_postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" >/dev/null 2>&1 || true
+pg_as_postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1 \
+  || pg_as_postgres psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};" \
+  || die "无法创建 PostgreSQL 数据库 ${DB_NAME}"
+pg_as_postgres psql -v ON_ERROR_STOP=1 -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${DB_USER};" >/dev/null 2>&1 || true
+pg_as_postgres psql -v ON_ERROR_STOP=1 -d "${DB_NAME}" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};" >/dev/null 2>&1 || true
+
+# 验证连接
+export PGPASSWORD="${DB_PASS}"
+if ! psql -h 127.0.0.1 -U "${DB_USER}" -d "${DB_NAME}" -c 'SELECT 1;' >/dev/null 2>&1; then
+  # 部分发行版仅 socket 信任
+  if ! pg_as_postgres psql -d "${DB_NAME}" -c 'SELECT 1;' >/dev/null 2>&1; then
+    die "PostgreSQL 用户/数据库连接失败，请检查 pg_hba.conf 与服务状态"
+  fi
+  warn "TCP 认证可能未放行，已通过本地 socket 验证数据库存在；请确保 config 使用 host=127.0.0.1 且 pg_hba 允许 md5/scram"
 fi
+unset PGPASSWORD
 
 # ---------- 二进制 ----------
 info "获取 K2Pay 二进制 (linux-${GOARCH})..."
@@ -226,10 +243,11 @@ server:
 
 database:
   host: "127.0.0.1"
-  port: 3306
+  port: 5432
   user: "${DB_USER}"
   password: "${DB_PASS}"
   dbname: "${DB_NAME}"
+  sslmode: "disable"
   max_open_conns: 50
   max_idle_conns: 10
   conn_max_lifetime: 60
@@ -297,7 +315,7 @@ info "配置 systemd..."
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=K2Pay Payment Gateway
-After=network-online.target mysql.service mariadb.service mysqld.service
+After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]

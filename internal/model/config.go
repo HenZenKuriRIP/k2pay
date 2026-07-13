@@ -7,8 +7,8 @@ import (
 // SystemConfig 系统配置表
 type SystemConfig struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
-	Key         string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"key"`
-	Value       string    `gorm:"type:text" json:"value"`
+	Key         string    `gorm:"column:key;type:varchar(50);uniqueIndex;not null" json:"key"`
+	Value       string    `gorm:"column:value;type:text" json:"value"`
 	Description string    `gorm:"type:varchar(200)" json:"description"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

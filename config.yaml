@@ -17,10 +17,11 @@ server:
 # ============================================================================
 database:
   host: "172.16.1.10"      # 数据库地址
-  port: 3306               # 数据库端口
+  port: 5432               # PostgreSQL 端口
   user: "k2pay"            # 用户名
   password: "Admin3579"    # 密码
   dbname: "k2pay"          # 数据库名
+  sslmode: "disable"       # disable / require / verify-full
   # 连接池配置
   max_open_conns: 100      # 最大打开连接数
   max_idle_conns: 10       # 最大空闲连接数

@@ -37,6 +37,7 @@ type DatabaseConfig struct {
 	User            string `mapstructure:"user"`
 	Password        string `mapstructure:"password"`
 	DBName          string `mapstructure:"dbname"`
+	SSLMode         string `mapstructure:"sslmode"` // disable / require / verify-full
 	MaxOpenConns    int    `mapstructure:"max_open_conns"`    // 最大打开连接数
 	MaxIdleConns    int    `mapstructure:"max_idle_conns"`    // 最大空闲连接数
 	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"` // 连接最大生命周期(分钟)
@@ -196,12 +197,13 @@ func setDefaults() {
 	viper.SetDefault("server.host", "0.0.0.0")
 	viper.SetDefault("server.port", 6088)
 
-	// Database
+	// Database (PostgreSQL)
 	viper.SetDefault("database.host", "127.0.0.1")
-	viper.SetDefault("database.port", 3306)
+	viper.SetDefault("database.port", 5432)
 	viper.SetDefault("database.user", "k2pay")
 	viper.SetDefault("database.password", "k2pay123")
 	viper.SetDefault("database.dbname", "k2pay")
+	viper.SetDefault("database.sslmode", "disable")
 	viper.SetDefault("database.max_open_conns", 100)
 	viper.SetDefault("database.max_idle_conns", 10)
 	viper.SetDefault("database.conn_max_lifetime", 60) // 60分钟
@@ -323,10 +325,11 @@ server:
 
 database:
   host: "127.0.0.1"
-  port: 3306
+  port: 5432
   user: "k2pay"
   password: "k2pay123"
   dbname: "k2pay"
+  sslmode: "disable"
   max_open_conns: 100
   max_idle_conns: 10
   conn_max_lifetime: 60
@@ -431,7 +434,14 @@ blockchain:
 	return os.WriteFile(configPath, []byte(configContent), 0644)
 }
 
+// DSN 返回 PostgreSQL 连接串
 func (c *DatabaseConfig) DSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		c.User, c.Password, c.Host, c.Port, c.DBName)
+	sslmode := c.SSLMode
+	if sslmode == "" {
+		sslmode = "disable"
+	}
+	return fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=Asia/Shanghai",
+		c.Host, c.Port, c.User, c.Password, c.DBName, sslmode,
+	)
 }

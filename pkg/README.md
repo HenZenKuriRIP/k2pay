@@ -1,6 +1,6 @@
-# EzPay 打包指南
+# K2Pay 打包指南
 
-本目录包含为不同 Linux 发行版构建 EzPay 安装包的脚本和配置文件。**所有构建脚本都使用本地源码**，不会从 GitHub 或其他远程仓库下载代码。
+本目录包含为不同 Linux 发行版构建 K2Pay 安装包的脚本和配置文件。**所有构建脚本都使用本地源码**，不会从 GitHub 或其他远程仓库下载代码。
 
 ## 目录结构
 
@@ -9,8 +9,8 @@ pkg/
 ├── archlinux/          # Arch Linux 打包文件
 │   ├── PKGBUILD       # Arch 打包配置
 │   ├── build.sh       # 自动化构建脚本
-│   ├── ezpay.install  # 安装/卸载钩子
-│   └── ezpay.service  # systemd 服务文件
+│   ├── k2pay.install  # 安装/卸载钩子
+│   └── k2pay.service  # systemd 服务文件
 ├── debian/            # Debian/Ubuntu 打包文件
 │   ├── build.sh       # 自动化构建脚本
 │   ├── control        # 包控制文件
@@ -19,7 +19,7 @@ pkg/
 │   ├── postinst       # 安装后脚本
 │   ├── prerm          # 卸载前脚本
 │   ├── postrm         # 卸载后脚本
-│   └── ezpay.service  # systemd 服务文件
+│   └── k2pay.service  # systemd 服务文件
 └── rpm/               # RPM 打包文件 (待实现)
 ```
 
@@ -48,12 +48,12 @@ makepkg -f --clean --noextract
 
 ```bash
 # 安装构建好的包
-sudo pacman -U release/dist/archlinux/ezpay-*.pkg.tar.zst
+sudo pacman -U release/dist/archlinux/k2pay-*.pkg.tar.zst
 
 # 配置服务
-sudo vim /etc/ezpay/config.yaml
-sudo systemctl enable ezpay
-sudo systemctl start ezpay
+sudo vim /etc/k2pay/config.yaml
+sudo systemctl enable k2pay
+sudo systemctl start k2pay
 ```
 
 ### 测试构建（推荐用于发布）
@@ -90,7 +90,7 @@ cd pkg/debian
 ./build.sh
 
 # 方法 2: 从项目根目录构建
-cd /path/to/ezpay
+cd /path/to/k2pay
 dpkg-buildpackage -us -uc -b
 ```
 
@@ -98,26 +98,26 @@ dpkg-buildpackage -us -uc -b
 
 ```bash
 # 安装构建好的包
-sudo dpkg -i release/dist/debian/ezpay_*.deb
+sudo dpkg -i release/dist/debian/k2pay_*.deb
 
 # 安装依赖（如果有缺失）
 sudo apt-get install -f
 
 # 配置服务
-sudo nano /etc/ezpay/config.yaml
-sudo systemctl enable ezpay
-sudo systemctl start ezpay
-sudo systemctl status ezpay
+sudo nano /etc/k2pay/config.yaml
+sudo systemctl enable k2pay
+sudo systemctl start k2pay
+sudo systemctl status k2pay
 ```
 
 ### 卸载
 
 ```bash
 # 保留配置文件
-sudo apt-get remove ezpay
+sudo apt-get remove k2pay
 
 # 完全删除（包括配置）
-sudo apt-get purge ezpay
+sudo apt-get purge k2pay
 ```
 
 ## 构建特性
@@ -146,29 +146,29 @@ GOOS=linux             # 目标操作系统
 
 打包后的安装包包含：
 
-- **二进制文件**: `/usr/bin/ezpay`
-- **配置文件**: `/etc/ezpay/config.yaml`
-- **Web 资源**: `/usr/share/ezpay/web/{templates,static}`
-- **systemd 服务**: `/usr/lib/systemd/system/ezpay.service` (Arch)
-  `/lib/systemd/system/ezpay.service` (Debian)
-- **数据目录**: `/var/lib/ezpay`
-- **日志目录**: `/var/log/ezpay`
-- **文档**: `/usr/share/doc/ezpay/README.md`
-- **许可证**: `/usr/share/licenses/ezpay/LICENSE` (Arch)
+- **二进制文件**: `/usr/bin/k2pay`
+- **配置文件**: `/etc/k2pay/config.yaml`
+- **Web 资源**: `/usr/share/k2pay/web/{templates,static}`
+- **systemd 服务**: `/usr/lib/systemd/system/k2pay.service` (Arch)
+  `/lib/systemd/system/k2pay.service` (Debian)
+- **数据目录**: `/var/lib/k2pay`
+- **日志目录**: `/var/log/k2pay`
+- **文档**: `/usr/share/doc/k2pay/README.md`
+- **许可证**: `/usr/share/licenses/k2pay/LICENSE` (Arch)
 
 ### 安装后操作
 
 包安装后会自动：
 
-1. 创建系统用户和组 `ezpay`
+1. 创建系统用户和组 `k2pay`
 2. 设置正确的文件权限
-3. 将配置文件权限设为 `600` (仅 ezpay 用户可读写)
+3. 将配置文件权限设为 `600` (仅 k2pay 用户可读写)
 4. 重新加载 systemd 配置
 
 ## 构建输出位置
 
-- **Arch Linux**: `release/dist/archlinux/ezpay-*.pkg.tar.zst`
-- **Debian**: `release/dist/debian/ezpay_*.deb`
+- **Arch Linux**: `release/dist/archlinux/k2pay-*.pkg.tar.zst`
+- **Debian**: `release/dist/debian/k2pay_*.deb`
 
 ## 版本管理
 
@@ -208,10 +208,10 @@ sudo apt install golang-go
 
 ```bash
 # 检查权限
-ls -la /path/to/ezpay
+ls -la /path/to/k2pay
 
 # 如果需要，修改权限
-sudo chown -R $USER:$USER /path/to/ezpay
+sudo chown -R $USER:$USER /path/to/k2pay
 ```
 
 ### makepkg 找不到文件
@@ -228,7 +228,7 @@ cd pkg/archlinux
 
 ```bash
 # 清理之前的构建
-rm -rf debian/ezpay debian/.debhelper
+rm -rf debian/k2pay debian/.debhelper
 
 # 确保 debian 符号链接正确
 ln -sf pkg/debian debian
@@ -248,7 +248,7 @@ ln -sf pkg/debian debian
 
 ### 修改 systemd 服务
 
-编辑对应的 `ezpay.service` 文件后重新构建包。
+编辑对应的 `k2pay.service` 文件后重新构建包。
 
 ### 测试包
 
@@ -279,4 +279,4 @@ cd pkg/archlinux && makepkg -f --clean --noextract
 
 ## 许可证
 
-与 EzPay 主项目相同的许可证。
+与 K2Pay 主项目相同的许可证。

@@ -1,5 +1,5 @@
--- EzPay 数据库初始化脚本
--- 创建数据库: CREATE DATABASE ezpay DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- K2Pay 数据库初始化脚本
+-- 创建数据库: CREATE DATABASE k2pay DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- =====================================================
 -- 表结构 (GORM会自动创建，此处仅供参考和手动初始化)
@@ -239,7 +239,7 @@ INSERT INTO `system_configs` (`key`, `value`, `description`, `created_at`, `upda
 ('float_percent', '0', '汇率浮动百分比', NOW(), NOW()),
 ('order_expire', '30', '订单过期时间(分钟)', NOW(), NOW()),
 ('notify_retry', '5', '通知重试次数', NOW(), NOW()),
-('site_name', 'EzPay', '网站名称', NOW(), NOW()),
+('site_name', 'K2Pay', '网站名称', NOW(), NOW()),
 ('system_wallet_fee_rate', '0.02', '系统收款码手续费率', NOW(), NOW()),
 ('personal_wallet_fee_rate', '0.01', '个人收款码手续费率', NOW(), NOW())
 ON DUPLICATE KEY UPDATE `key` = VALUES(`key`);

@@ -628,7 +628,7 @@ func (s *OrderService) determineChannel(requestedChannel string, chain string) s
 
 	// 检查是否有默认的上游通道配置
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", "default_channel").First(&config).Error; err == nil {
+	if err := model.GetDB().Where(`"key" = ?`, "default_channel").First(&config).Error; err == nil {
 		if config.Value != "" && config.Value != "local" {
 			channelService := GetChannelService()
 			if _, err := channelService.GetChannelConfig(ChannelType(config.Value)); err == nil {
@@ -651,7 +651,7 @@ func (s *OrderService) createUpstreamOrder(order *model.Order, channel string) e
 	// 构建本系统的回调地址
 	var notifyURL string
 	var siteConfig model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", "site_url").First(&siteConfig).Error; err == nil {
+	if err := model.GetDB().Where(`"key" = ?`, "site_url").First(&siteConfig).Error; err == nil {
 		notifyURL = siteConfig.Value + "/channel/notify/" + channel
 	} else {
 		notifyURL = "/channel/notify/" + channel
@@ -949,7 +949,7 @@ func (s *OrderService) StartExpireWorker() {
 // getOrderExpireMinutes 获取订单过期时间(分钟)
 func (s *OrderService) getOrderExpireMinutes() int {
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", model.ConfigKeyOrderExpire).First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, model.ConfigKeyOrderExpire).First(&config).Error; err != nil {
 		return 30
 	}
 	minutes, err := strconv.Atoi(config.Value)
@@ -968,7 +968,7 @@ func (s *OrderService) selectWalletByMode(merchant *model.Merchant, chain string
 	var useMerchantWallet bool
 
 	// 轮询排序：按最后使用时间升序（NULL值优先，即从未使用的钱包优先）
-	roundRobinOrder := "COALESCE(last_used_at, '1970-01-01') ASC"
+	roundRobinOrder := "COALESCE(last_used_at, '1970-01-01'::timestamptz) ASC"
 
 	switch merchant.WalletMode {
 	case 1: // 仅系统钱包
@@ -1005,7 +1005,7 @@ func (s *OrderService) selectWalletByMode(merchant *model.Merchant, chain string
 // getSystemWalletFeeRate 获取系统收款码手续费率
 func (s *OrderService) getSystemWalletFeeRate() decimal.Decimal {
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", model.ConfigKeySystemWalletFeeRate).First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, model.ConfigKeySystemWalletFeeRate).First(&config).Error; err != nil {
 		return decimal.NewFromFloat(0.02) // 默认2%
 	}
 	rate, err := decimal.NewFromString(config.Value)
@@ -1018,7 +1018,7 @@ func (s *OrderService) getSystemWalletFeeRate() decimal.Decimal {
 // getPersonalWalletFeeRate 获取个人收款码手续费率
 func (s *OrderService) getPersonalWalletFeeRate() decimal.Decimal {
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", model.ConfigKeyPersonalWalletFeeRate).First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, model.ConfigKeyPersonalWalletFeeRate).First(&config).Error; err != nil {
 		return decimal.NewFromFloat(0.01) // 默认1%
 	}
 	rate, err := decimal.NewFromString(config.Value)

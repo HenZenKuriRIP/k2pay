@@ -67,7 +67,7 @@ func Get(name string) (Driver, bool) {
 // GetConfig 读取 system_configs 中的配置值
 func GetConfig(key, def string) string {
 	var cfg model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", key).First(&cfg).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, key).First(&cfg).Error; err != nil {
 		return def
 	}
 	if cfg.Value == "" {
@@ -79,7 +79,7 @@ func GetConfig(key, def string) string {
 // SetConfig 写入配置
 func SetConfig(key, value, desc string) error {
 	var cfg model.SystemConfig
-	err := model.GetDB().Where("`key` = ?", key).First(&cfg).Error
+	err := model.GetDB().Where(`"key" = ?`, key).First(&cfg).Error
 	if err != nil {
 		return model.GetDB().Create(&model.SystemConfig{
 			Key: key, Value: value, Description: desc,
@@ -156,7 +156,7 @@ func EnsureDefaultConfigs() {
 	}
 	for _, d := range defaults {
 		var count int64
-		model.GetDB().Model(&model.SystemConfig{}).Where("`key` = ?", d.Key).Count(&count)
+		model.GetDB().Model(&model.SystemConfig{}).Where(`"key" = ?`, d.Key).Count(&count)
 		if count == 0 {
 			model.GetDB().Create(&d)
 		}

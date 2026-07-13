@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "EzPay",
+    "appName": "K2Pay",
     "loading": "در حال بارگذاری...",
     "confirm": "تأیید",
     "cancel": "لغو",
@@ -56,7 +56,7 @@
     "invalidCredentials": "نام کاربری یا رمز عبور نامعتبر"
   },
   "admin": {
-    "title": "پنل مدیریت EzPay",
+    "title": "پنل مدیریت K2Pay",
     "dashboard": "داشبورد",
     "merchants": "بازرگانان",
     "wallets": "کیف پول‌ها",
@@ -91,7 +91,7 @@
     "orderCount": "تعداد سفارش"
   },
   "merchant": {
-    "title": "پنل بازرگان EzPay",
+    "title": "پنل بازرگان K2Pay",
     "pid": "شناسه بازرگان",
     "name": "نام",
     "balance": "موجودی",

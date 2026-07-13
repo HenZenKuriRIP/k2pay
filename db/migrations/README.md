@@ -1,4 +1,4 @@
-# EzPay 数据库版本管理系统
+# K2Pay 数据库版本管理系统
 
 ## 📋 概述
 
@@ -191,7 +191,7 @@ cd ../..  # 回到项目根目录
 迁移失败时，工具会自动提示回滚命令：
 
 ```bash
-mysql -h 172.16.1.10 -u ezpay -p'Admin3579' --skip-ssl ezpay < backup_20260130_100015.sql
+mysql -h 172.16.1.10 -u k2pay -p'Admin3579' --skip-ssl k2pay < backup_20260130_100015.sql
 ```
 
 ### 手动回滚
@@ -208,7 +208,7 @@ mysql -h 172.16.1.10 -u ezpay -p'Admin3579' --skip-ssl ezpay < backup_20260130_1
 
 3. **执行回滚**：
    ```bash
-   mysql -h 172.16.1.10 -u ezpay -p'Admin3579' --skip-ssl ezpay < backup_20260130_100015.sql
+   mysql -h 172.16.1.10 -u k2pay -p'Admin3579' --skip-ssl k2pay < backup_20260130_100015.sql
    ```
 
 4. **清理失败记录**（可选）：
@@ -294,7 +294,7 @@ git pull
 
 ```bash
 # 1. 备份（额外备份）
-mysqldump -h xxx -u xxx -pxxx ezpay > manual_backup.sql
+mysqldump -h xxx -u xxx -pxxx k2pay > manual_backup.sql
 
 # 2. 查看待执行迁移
 ./db/migrate.sh status

@@ -289,7 +289,7 @@ func (s *WithdrawService) CompleteWithdrawal(id uint, adminRemark string) error 
 // getWithdrawFeeRate 获取提现手续费率
 func (s *WithdrawService) getWithdrawFeeRate() float64 {
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", "withdraw_fee_rate").First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, "withdraw_fee_rate").First(&config).Error; err != nil {
 		return 0 // 默认无手续费
 	}
 	var rate float64

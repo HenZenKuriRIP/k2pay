@@ -202,6 +202,7 @@ func registerRoutes(r *gin.Engine, cfg *config.Config) {
 		adminAPI.GET("/dashboard", adminHandler.Dashboard)
 		adminAPI.GET("/dashboard/trend", adminHandler.DashboardTrend)
 		adminAPI.GET("/dashboard/top", adminHandler.DashboardTop)
+		adminAPI.GET("/dashboard/system", adminHandler.GetSystemMetrics)
 
 		// 订单管理
 		adminAPI.GET("/orders", adminHandler.ListOrders)
@@ -486,7 +487,7 @@ func startBackgroundServices(cfg *config.Config) {
 
 	// 启动Telegram通知服务 - 从数据库加载配置
 	var configs []model.SystemConfig
-	model.GetDB().Where("`key` IN (?)", []string{
+	model.GetDB().Where(`"key" IN (?)`, []string{
 		"telegram_enabled",
 		"telegram_bot_token",
 		"telegram_mode",

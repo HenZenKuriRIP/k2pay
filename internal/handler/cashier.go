@@ -68,7 +68,7 @@ func (h *CashierHandler) ShowCashier(c *gin.Context) {
 	// 获取订单过期时间配置
 	expireMinutes := 30 // 默认30分钟
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", model.ConfigKeyOrderExpire).First(&config).Error; err == nil {
+	if err := model.GetDB().Where(`"key" = ?`, model.ConfigKeyOrderExpire).First(&config).Error; err == nil {
 		if minutes, err := strconv.Atoi(config.Value); err == nil {
 			expireMinutes = minutes
 		}

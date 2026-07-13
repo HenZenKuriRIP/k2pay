@@ -263,6 +263,20 @@
             .sidebar { transform: translateX(-100%); }
             .main-content { margin-left: 0; padding: 16px; }
         }
+
+        /* Server metrics */
+        .metric-bar {
+            height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-top: 10px;
+        }
+        .metric-bar-fill {
+            height: 100%; width: 0%; border-radius: 99px; background: var(--primary);
+            transition: width .4s ease, background .3s;
+        }
+        .m-meta-box {
+            background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+            padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;
+        }
+        .m-meta-label { font-size: 11px; color: var(--text-3); font-weight: 550; text-transform: uppercase; letter-spacing: .04em; }
     </style>
 </head>
 <body>
@@ -359,6 +373,52 @@
                     <div class="stat-card">
                         <h3 data-i18n="dashboard.availableChannels">支付链路</h3>
                         <div class="value" id="availableChannels">0</div>
+                    </div>
+                </div>
+
+                <!-- 服务器指标 -->
+                <div class="card" id="systemMetricsCard">
+                    <div class="card-header">
+                        <h2>服务器监控</h2>
+                        <div class="btn-group">
+                            <span id="sysHealthBadge" class="badge badge-muted">—</span>
+                            <button class="btn btn-outline btn-sm" onclick="loadSystemMetrics()"><i class="fas fa-sync-alt"></i> 刷新</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="stats-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px;">
+                            <div class="stat-card" style="padding:16px;">
+                                <h3>CPU</h3>
+                                <div class="value" id="sysCpu" style="font-size:22px;">—</div>
+                                <div class="sub" id="sysCpuSub">—</div>
+                                <div class="metric-bar"><div id="sysCpuBar" class="metric-bar-fill"></div></div>
+                            </div>
+                            <div class="stat-card" style="padding:16px;">
+                                <h3>内存</h3>
+                                <div class="value" id="sysMem" style="font-size:22px;">—</div>
+                                <div class="sub" id="sysMemSub">—</div>
+                                <div class="metric-bar"><div id="sysMemBar" class="metric-bar-fill"></div></div>
+                            </div>
+                            <div class="stat-card" style="padding:16px;">
+                                <h3>磁盘</h3>
+                                <div class="value" id="sysDisk" style="font-size:22px;">—</div>
+                                <div class="sub" id="sysDiskSub">—</div>
+                                <div class="metric-bar"><div id="sysDiskBar" class="metric-bar-fill"></div></div>
+                            </div>
+                            <div class="stat-card" style="padding:16px;">
+                                <h3>进程 / 运行</h3>
+                                <div class="value" id="sysUptime" style="font-size:18px;">—</div>
+                                <div class="sub" id="sysProcSub">—</div>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;font-size:13px;color:var(--text-2);">
+                            <div class="m-meta-box"><span class="m-meta-label">主机</span><span id="sysHost">—</span></div>
+                            <div class="m-meta-box"><span class="m-meta-label">负载</span><span id="sysLoad">—</span></div>
+                            <div class="m-meta-box"><span class="m-meta-label">Go / 协程</span><span id="sysGo">—</span></div>
+                            <div class="m-meta-box"><span class="m-meta-label">进程内存</span><span id="sysProcMem">—</span></div>
+                            <div class="m-meta-box"><span class="m-meta-label">数据库连接</span><span id="sysDB">—</span></div>
+                            <div class="m-meta-box"><span class="m-meta-label">GC 次数</span><span id="sysGC">—</span></div>
+                        </div>
                     </div>
                 </div>
 
@@ -1249,10 +1309,96 @@
                 }
                 statusHtml += '</table>';
                 document.getElementById('blockchainStatus').innerHTML = statusHtml;
+                if (data.data.system) {
+                    renderSystemMetrics(data.data.system);
+                }
             }
             // 加载趋势图和TOP数据
             loadTrendData('today');
             loadTopMerchants();
+            loadSystemMetrics();
+        }
+
+        let systemMetricsTimer = null;
+        function metricBarColor(p) {
+            if (p >= 90) return '#dc2626';
+            if (p >= 75) return '#d97706';
+            if (p >= 50) return '#2563eb';
+            return '#059669';
+        }
+        function setMetricBar(id, percent) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const p = Math.max(0, Math.min(100, percent || 0));
+            el.style.width = p + '%';
+            el.style.background = metricBarColor(p);
+        }
+        function renderSystemMetrics(s) {
+            if (!s) return;
+            const cpu = (s.cpu && s.cpu.percent) || 0;
+            const mem = (s.memory && s.memory.used_percent) || 0;
+            const disk = (s.disk && s.disk.used_percent) || 0;
+            document.getElementById('sysCpu').textContent = cpu.toFixed(1) + '%';
+            document.getElementById('sysCpuSub').textContent = (s.cpu && s.cpu.cores ? s.cpu.cores + ' 核' : '') +
+                (s.cpu && s.cpu.process_percent != null ? ' · 进程 ' + Number(s.cpu.process_percent).toFixed(1) + '%' : '');
+            setMetricBar('sysCpuBar', cpu);
+
+            document.getElementById('sysMem').textContent = mem.toFixed(1) + '%';
+            if (s.memory) {
+                document.getElementById('sysMemSub').textContent =
+                    (s.memory.used_mb || 0).toFixed(0) + ' / ' + (s.memory.total_mb || 0).toFixed(0) + ' MB';
+            }
+            setMetricBar('sysMemBar', mem);
+
+            document.getElementById('sysDisk').textContent = disk.toFixed(1) + '%';
+            if (s.disk) {
+                document.getElementById('sysDiskSub').textContent =
+                    (s.disk.used_gb || 0).toFixed(1) + ' / ' + (s.disk.total_gb || 0).toFixed(1) + ' GB · ' + (s.disk.path || '');
+            }
+            setMetricBar('sysDiskBar', disk);
+
+            document.getElementById('sysUptime').textContent = s.uptime_human || '—';
+            document.getElementById('sysProcSub').textContent = 'PID ' + (s.pid || '—') + ' · 健康分 ' + (s.health_score != null ? s.health_score : '—');
+
+            const host = s.host || {};
+            document.getElementById('sysHost').textContent =
+                (host.hostname || '—') + (host.platform ? ' · ' + host.platform + ' ' + (host.platform_version || '') : '');
+            const load = s.load || {};
+            document.getElementById('sysLoad').textContent =
+                [load.load1, load.load5, load.load15].map(v => v != null ? Number(v).toFixed(2) : '—').join(' / ');
+            document.getElementById('sysGo').textContent =
+                (s.go_version || '') + ' · ' + (s.goroutines || 0) + ' goroutines';
+            const proc = s.process || {};
+            document.getElementById('sysProcMem').textContent =
+                'Alloc ' + (proc.alloc_mb != null ? proc.alloc_mb : '—') + ' MB' +
+                (proc.rss_mb != null ? ' · RSS ' + proc.rss_mb + ' MB' : '');
+            const db = s.database || {};
+            document.getElementById('sysDB').textContent =
+                (db.in_use != null ? db.in_use : '—') + ' 使用 / ' +
+                (db.open_connections != null ? db.open_connections : '—') + ' 打开 / 最大 ' +
+                (db.max_open_connections != null ? db.max_open_connections : '—');
+            document.getElementById('sysGC').textContent = proc.gc_num != null ? String(proc.gc_num) : '—';
+
+            const score = s.health_score != null ? s.health_score : 0;
+            const badge = document.getElementById('sysHealthBadge');
+            if (badge) {
+                let cls = 'badge-success', label = '优秀';
+                if (score < 40) { cls = 'badge-danger'; label = '告警'; }
+                else if (score < 60) { cls = 'badge-warning'; label = '偏高'; }
+                else if (score < 80) { cls = 'badge-info'; label = '良好'; }
+                badge.className = 'badge ' + cls;
+                badge.textContent = label + ' ' + score;
+            }
+        }
+        async function loadSystemMetrics() {
+            const data = await api('/admin/api/dashboard/system');
+            if (data.code === 1) renderSystemMetrics(data.data);
+            if (!systemMetricsTimer) {
+                systemMetricsTimer = setInterval(() => {
+                    const page = document.querySelector('.page.active');
+                    if (page && page.id === 'page-dashboard') loadSystemMetrics();
+                }, 10000);
+            }
         }
 
         let ordersChartInstance = null;

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "EzPay",
+    "appName": "K2Pay",
     "loading": "載入中...",
     "confirm": "確認",
     "cancel": "取消",
@@ -56,7 +56,7 @@
     "invalidCredentials": "使用者名稱或密碼錯誤"
   },
   "admin": {
-    "title": "EzPay 管理後台",
+    "title": "K2Pay 管理後台",
     "dashboard": "儀表板",
     "merchants": "商戶管理",
     "wallets": "錢包管理",
@@ -91,7 +91,7 @@
     "orderCount": "訂單數"
   },
   "merchant": {
-    "title": "EzPay 商戶後台",
+    "title": "K2Pay 商戶後台",
     "pid": "商戶ID",
     "name": "商戶名稱",
     "balance": "餘額",

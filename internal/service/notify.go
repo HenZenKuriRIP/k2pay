@@ -153,7 +153,7 @@ func (s *NotifyService) sendNotify(notifyURL string, params map[string]string) b
 // getMaxRetry 获取最大重试次数
 func (s *NotifyService) getMaxRetry() int {
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", model.ConfigKeyNotifyRetry).First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, model.ConfigKeyNotifyRetry).First(&config).Error; err != nil {
 		return 5
 	}
 	retry, err := strconv.Atoi(config.Value)

@@ -1061,12 +1061,12 @@ func (s *BlockchainService) GetListenerStatus() map[string]interface{} {
 	alipayEnabled := true
 
 	var wechatConfig model.SystemConfig
-	if model.GetDB().Where("`key` = ?", model.ConfigKeyWechatEnabled).First(&wechatConfig).Error == nil {
+	if model.GetDB().Where(`"key" = ?`, model.ConfigKeyWechatEnabled).First(&wechatConfig).Error == nil {
 		wechatEnabled = wechatConfig.Value == "1" || wechatConfig.Value == "true"
 	}
 
 	var alipayConfig model.SystemConfig
-	if model.GetDB().Where("`key` = ?", model.ConfigKeyAlipayEnabled).First(&alipayConfig).Error == nil {
+	if model.GetDB().Where(`"key" = ?`, model.ConfigKeyAlipayEnabled).First(&alipayConfig).Error == nil {
 		alipayEnabled = alipayConfig.Value == "1" || alipayConfig.Value == "true"
 	}
 
@@ -1836,7 +1836,7 @@ func (s *BlockchainService) checkFiatChannelHealth(chain string) map[string]inte
 
 func getSystemConfigValue(key, def string) string {
 	var cfg model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", key).First(&cfg).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, key).First(&cfg).Error; err != nil {
 		return def
 	}
 	if cfg.Value == "" {
@@ -2122,7 +2122,7 @@ func (s *BlockchainService) setPassiveChannelEnabled(channel string, enabled boo
 
 	// 更新数据库配置
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", configKey).First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, configKey).First(&config).Error; err != nil {
 		// 不存在，创建新记录
 		config = model.SystemConfig{
 			Key:         configKey,
@@ -2151,7 +2151,7 @@ func (s *BlockchainService) IsChainEnabled(chain string) bool {
 		if chain == "alipay" {
 			key = model.ConfigKeyAlipayEnabled
 		}
-		if model.GetDB().Where("`key` = ?", key).First(&cfg).Error == nil {
+		if model.GetDB().Where(`"key" = ?`, key).First(&cfg).Error == nil {
 			return cfg.Value == "1" || cfg.Value == "true"
 		}
 		return true // 默认启用
@@ -2200,14 +2200,14 @@ func (s *BlockchainService) GetChainStatus() map[string]bool {
 
 	// 添加被动渠道（微信/支付宝）状态
 	var wechatConfig model.SystemConfig
-	if model.GetDB().Where("`key` = ?", model.ConfigKeyWechatEnabled).First(&wechatConfig).Error == nil {
+	if model.GetDB().Where(`"key" = ?`, model.ConfigKeyWechatEnabled).First(&wechatConfig).Error == nil {
 		status["wechat"] = wechatConfig.Value == "1" || wechatConfig.Value == "true"
 	} else {
 		status["wechat"] = true // 默认启用
 	}
 
 	var alipayConfig model.SystemConfig
-	if model.GetDB().Where("`key` = ?", model.ConfigKeyAlipayEnabled).First(&alipayConfig).Error == nil {
+	if model.GetDB().Where(`"key" = ?`, model.ConfigKeyAlipayEnabled).First(&alipayConfig).Error == nil {
 		status["alipay"] = alipayConfig.Value == "1" || alipayConfig.Value == "true"
 	} else {
 		status["alipay"] = true // 默认启用

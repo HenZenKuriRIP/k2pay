@@ -1,4 +1,4 @@
-# EzPay 数据库版本管理
+# K2Pay 数据库版本管理
 
 ## 📌 当前版本
 
@@ -130,7 +130,7 @@ cd ../..  # 回到项目根目录
 1. 查看错误信息
 2. 使用备份文件回滚：
    ```bash
-   mysql -h 172.16.1.10 -u ezpay -p'Admin3579' --skip-ssl ezpay < backup_YYYYMMDD_HHMMSS.sql
+   mysql -h 172.16.1.10 -u k2pay -p'Admin3579' --skip-ssl k2pay < backup_YYYYMMDD_HHMMSS.sql
    ```
 3. 修复SQL脚本（创建新版本）
 4. 重新执行迁移

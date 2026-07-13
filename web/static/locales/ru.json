@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "EzPay",
+    "appName": "K2Pay",
     "loading": "Загрузка...",
     "confirm": "Подтвердить",
     "cancel": "Отмена",
@@ -56,7 +56,7 @@
     "invalidCredentials": "Неверное имя пользователя или пароль"
   },
   "admin": {
-    "title": "EzPay Администратор",
+    "title": "K2Pay Администратор",
     "dashboard": "Панель управления",
     "merchants": "Мерчанты",
     "wallets": "Кошельки",
@@ -91,7 +91,7 @@
     "orderCount": "Заказы"
   },
   "merchant": {
-    "title": "EzPay Мерчант",
+    "title": "K2Pay Мерчант",
     "pid": "ID мерчанта",
     "name": "Название",
     "balance": "Баланс",

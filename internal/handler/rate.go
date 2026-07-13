@@ -248,7 +248,7 @@ func (h *RateHandler) UpdateFloatSettings(c *gin.Context) {
 	// 更新配置
 	db := model.GetDB()
 
-	if err := db.Model(&model.SystemConfig{}).Where("`key` = ?", model.ConfigKeyRateBuyFloat).
+	if err := db.Model(&model.SystemConfig{}).Where(`"key" = ?`, model.ConfigKeyRateBuyFloat).
 		Updates(map[string]interface{}{
 			"value":      req.BuyFloat,
 			"updated_at": time.Now(),
@@ -257,7 +257,7 @@ func (h *RateHandler) UpdateFloatSettings(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&model.SystemConfig{}).Where("`key` = ?", model.ConfigKeyRateSellFloat).
+	if err := db.Model(&model.SystemConfig{}).Where(`"key" = ?`, model.ConfigKeyRateSellFloat).
 		Updates(map[string]interface{}{
 			"value":      req.SellFloat,
 			"updated_at": time.Now(),
@@ -272,7 +272,7 @@ func (h *RateHandler) UpdateFloatSettings(c *gin.Context) {
 		if *req.AutoUpdate {
 			autoUpdateValue = "1"
 		}
-		if err := db.Model(&model.SystemConfig{}).Where("`key` = ?", model.ConfigKeyRateAutoUpdate).
+		if err := db.Model(&model.SystemConfig{}).Where(`"key" = ?`, model.ConfigKeyRateAutoUpdate).
 			Updates(map[string]interface{}{
 				"value":      autoUpdateValue,
 				"updated_at": time.Now(),

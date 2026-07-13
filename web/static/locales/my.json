@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "EzPay",
+    "appName": "K2Pay",
     "loading": "ဖွင့်နေသည်...",
     "confirm": "အတည်ပြု",
     "cancel": "ပယ်ဖျက်",
@@ -56,7 +56,7 @@
     "invalidCredentials": "အသုံးပြုသူအမည် သို့ စကားဝှက် မှားနေသည်"
   },
   "admin": {
-    "title": "EzPay စီမံခန့်ခွဲမှု",
+    "title": "K2Pay စီမံခန့်ခွဲမှု",
     "dashboard": "ဒက်ရှ်ဘုတ်",
     "merchants": "ကုန်သည်များ",
     "wallets": "ပိုက်ဆံအိတ်များ",
@@ -91,7 +91,7 @@
     "orderCount": "အော်ဒါ"
   },
   "merchant": {
-    "title": "EzPay ကုန်သည်",
+    "title": "K2Pay ကုန်သည်",
     "pid": "ကုန်သည် ID",
     "name": "အမည်",
     "balance": "လက်ကျန်ငွေ",

@@ -72,7 +72,7 @@ func GetChannelService() *ChannelService {
 // GetChannelConfig 获取指定类型的通道配置
 func (s *ChannelService) GetChannelConfig(channelType ChannelType) (*ChannelConfig, error) {
 	var configs []model.SystemConfig
-	model.GetDB().Where("`key` LIKE 'channel_%'").Find(&configs)
+	model.GetDB().Where(`"key" LIKE 'channel_%'`).Find(&configs)
 
 	configMap := make(map[string]string)
 	for _, cfg := range configs {
@@ -101,7 +101,7 @@ func (s *ChannelService) GetChannelConfig(channelType ChannelType) (*ChannelConf
 // GetEnabledChannels 获取所有启用的通道
 func (s *ChannelService) GetEnabledChannels() []*ChannelConfig {
 	var configs []model.SystemConfig
-	model.GetDB().Where("`key` LIKE 'channel_%_enabled' AND `value` = '1'").Find(&configs)
+	model.GetDB().Where(`"key" LIKE 'channel_%_enabled' AND "value" = '1'`).Find(&configs)
 
 	var channels []*ChannelConfig
 	for _, cfg := range configs {

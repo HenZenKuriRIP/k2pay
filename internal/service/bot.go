@@ -55,7 +55,7 @@ func (s *BotService) ReloadConfig() {
 // getConfigValue 获取系统配置值
 func (s *BotService) getConfigValue(key, defaultValue string) string {
 	var config model.SystemConfig
-	if err := model.GetDB().Where("`key` = ?", key).First(&config).Error; err != nil {
+	if err := model.GetDB().Where(`"key" = ?`, key).First(&config).Error; err != nil {
 		return defaultValue
 	}
 	if config.Value == "" {

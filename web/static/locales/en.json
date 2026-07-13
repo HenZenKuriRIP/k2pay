@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "EzPay",
+    "appName": "K2Pay",
     "loading": "Loading...",
     "confirm": "Confirm",
     "cancel": "Cancel",
@@ -56,7 +56,7 @@
     "invalidCredentials": "Invalid username or password"
   },
   "admin": {
-    "title": "EzPay Admin",
+    "title": "K2Pay Admin",
     "dashboard": "Dashboard",
     "merchants": "Merchants",
     "wallets": "Wallets",
@@ -262,7 +262,7 @@
     "orderCount": "Orders"
   },
   "merchant": {
-    "title": "EzPay Merchant Portal",
+    "title": "K2Pay Merchant Portal",
     "pid": "Merchant ID",
     "name": "Merchant Name",
     "balance": "Balance",

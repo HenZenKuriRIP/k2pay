@@ -129,40 +129,49 @@ func (h *AdminHandler) Dashboard(c *gin.Context) {
 			"stats":      stats,
 			"rate":       rate.String(),
 			"blockchain": blockchainStatus,
+			"system":     service.GetSystemMetrics(),
 		},
 	})
 }
 
-// DashboardTrend 仪表盘趋势数据
+// GetSystemMetrics 服务器指标监控
+func (h *AdminHandler) GetSystemMetrics(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"code": 1,
+		"data": service.GetSystemMetrics(),
+	})
+}
+
+// DashboardTrend 仪表盘趋势数据（PostgreSQL）
 func (h *AdminHandler) DashboardTrend(c *gin.Context) {
 	period := c.DefaultQuery("period", "today")
 
 	var startDate time.Time
-	var dateFormat string
+	var selectExpr string
 	var groupBy string
 
 	now := time.Now()
 	switch period {
 	case "today":
 		startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		dateFormat = "%H:00"
-		groupBy = "HOUR(created_at)"
+		selectExpr = "to_char(created_at, 'HH24:00') as label"
+		groupBy = "to_char(created_at, 'HH24:00')"
 	case "week":
 		startDate = now.AddDate(0, 0, -6)
-		dateFormat = "%m-%d"
-		groupBy = "DATE(created_at)"
+		selectExpr = "to_char(created_at, 'MM-DD') as label"
+		groupBy = "to_char(created_at, 'MM-DD')"
 	case "month":
 		startDate = now.AddDate(0, 0, -29)
-		dateFormat = "%m-%d"
-		groupBy = "DATE(created_at)"
+		selectExpr = "to_char(created_at, 'MM-DD') as label"
+		groupBy = "to_char(created_at, 'MM-DD')"
 	case "3months":
 		startDate = now.AddDate(0, -3, 0)
-		dateFormat = "%Y-%m-%d"
-		groupBy = "YEARWEEK(created_at, 1)"
+		selectExpr = "to_char(date_trunc('week', created_at), 'YYYY-MM-DD') as label"
+		groupBy = "date_trunc('week', created_at)"
 	default:
 		startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		dateFormat = "%H:00"
-		groupBy = "HOUR(created_at)"
+		selectExpr = "to_char(created_at, 'HH24:00') as label"
+		groupBy = "to_char(created_at, 'HH24:00')"
 	}
 
 	var trends []struct {
@@ -171,17 +180,12 @@ func (h *AdminHandler) DashboardTrend(c *gin.Context) {
 		AmountUSD float64 `json:"amount_usd"`
 	}
 
-	query := model.GetDB().Model(&model.Order{}).
-		Where("status = 1 AND created_at >= ?", startDate)
-
-	// 使用 settlement_amount 作为 USD 金额
-	if period == "3months" {
-		query.Select("MIN(DATE_FORMAT(created_at, ?)) as label, COUNT(*) as count, COALESCE(SUM(settlement_amount), 0) as amount_usd", dateFormat)
-	} else {
-		query.Select("DATE_FORMAT(created_at, ?) as label, COUNT(*) as count, COALESCE(SUM(settlement_amount), 0) as amount_usd", dateFormat)
-	}
-
-	query.Group(groupBy).Order("label ASC").Scan(&trends)
+	model.GetDB().Model(&model.Order{}).
+		Where("status = 1 AND created_at >= ?", startDate).
+		Select(selectExpr + ", COUNT(*) as count, COALESCE(SUM(settlement_amount), 0) as amount_usd").
+		Group(groupBy).
+		Order("label ASC").
+		Scan(&trends)
 
 	labels := make([]string, len(trends))
 	orders := make([]int64, len(trends))
@@ -925,7 +929,7 @@ func (h *AdminHandler) UpdateConfigs(c *gin.Context) {
 
 	for key, value := range req {
 		// 使用 upsert 方式确保配置存在
-		model.GetDB().Where("`key` = ?", key).Assign(model.SystemConfig{Value: value}).FirstOrCreate(&model.SystemConfig{Key: key})
+		model.GetDB().Where(`"key" = ?`, key).Assign(model.SystemConfig{Value: value}).FirstOrCreate(&model.SystemConfig{Key: key})
 	}
 
 	// 清除汇率缓存
@@ -943,7 +947,7 @@ func (h *AdminHandler) UpdateConfigs(c *gin.Context) {
 	if needUpdateTelegram {
 		// 从数据库重新加载完整配置
 		var configs []model.SystemConfig
-		model.GetDB().Where("`key` IN (?)", []string{
+		model.GetDB().Where(`"key" IN (?)`, []string{
 			"telegram_enabled",
 			"telegram_bot_token",
 			"telegram_mode",
@@ -998,7 +1002,7 @@ func (h *AdminHandler) TestTelegramBot(c *gin.Context) {
 	} else {
 		// 如果请求体没有，从数据库获取
 		var cfg model.SystemConfig
-		if err := model.GetDB().Where("`key` = ?", "telegram_bot_token").First(&cfg).Error; err != nil || cfg.Value == "" {
+		if err := model.GetDB().Where(`"key" = ?`, "telegram_bot_token").First(&cfg).Error; err != nil || cfg.Value == "" {
 			c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "未配置 Bot Token，请先填写 Token"})
 			return
 		}
