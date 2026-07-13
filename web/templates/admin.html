@@ -1800,11 +1800,28 @@
                         <td>${m.status === 1 ? '<span class="badge badge-success">正常</span>' : '<span class="badge badge-danger">禁用</span>'}</td>
                         <td>${m.created_at}</td>
                         <td>
-                            <button class="btn btn-sm" onclick="showMerchantKey(${m.id})">密钥</button>
-                            <button class="btn btn-sm btn-primary" onclick="editMerchant(${m.id})">编辑</button>
+                            <div class="btn-group">
+                                <button class="btn btn-sm" onclick="showMerchantKey(${m.id})">密钥</button>
+                                <button class="btn btn-sm btn-primary" onclick="editMerchant(${m.id})">编辑</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteMerchant(${m.id}, '${(m.name || m.pid || '').replace(/'/g, "\\'")}')">删除</button>
+                            </div>
                         </td>
                     </tr>
                 `).join('');
+            }
+        }
+
+        async function deleteMerchant(id, name) {
+            if (!confirm('确定删除商户「' + (name || id) + '」？\n\n将同时删除其钱包与提现地址（软删除）。\n若商户仍有余额则无法删除。')) {
+                return;
+            }
+            const data = await api('/admin/api/merchants/' + id, { method: 'DELETE' });
+            if (data.code === 1) {
+                showToast(data.msg || '已删除');
+                delete merchantsData[id];
+                loadMerchants();
+            } else {
+                alert(data.msg || '删除失败');
             }
         }
 
@@ -2436,7 +2453,7 @@
                 });
             }
 
-            // 链选项：内置 + 动态添加的链
+            // 链选项：仅展示已启用的链（与链监控状态一致）
             let chainOptions = '';
             const chainsData = await api('/admin/api/chains');
             if (chainsData.code === 1 && chainsData.data) {
@@ -2445,23 +2462,14 @@
                 const ordered = [...preferred.filter(c => chainsData.data[c]), ...keys.filter(c => !preferred.includes(c)).sort()];
                 for (const c of ordered) {
                     const info = chainsData.data[c];
+                    if (!info || !info.enabled) continue;
                     const name = (info && info.name) || chainNames[c] || c.toUpperCase();
                     chainOptions += `<option value="${c}">${name}</option>`;
                 }
             }
             if (!chainOptions) {
-                chainOptions = `
-                    <option value="trx">TRX (Tron)</option>
-                    <option value="trc20">TRC20 (Tron USDT)</option>
-                    <option value="erc20">ERC20 (Ethereum)</option>
-                    <option value="bep20">BEP20 (BSC)</option>
-                    <option value="polygon">Polygon</option>
-                    <option value="optimism">Optimism</option>
-                    <option value="arbitrum">Arbitrum</option>
-                    <option value="avalanche">Avalanche</option>
-                    <option value="base">Base</option>
-                    <option value="wechat">微信收款</option>
-                    <option value="alipay">支付宝收款</option>`;
+                alert('当前没有已启用的支付链路，请先在「链监控」中启用后再添加钱包');
+                return;
             }
 
             document.getElementById('modalTitle').textContent = '添加钱包';

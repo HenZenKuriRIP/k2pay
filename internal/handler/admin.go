@@ -597,6 +597,40 @@ func (h *AdminHandler) UpdateMerchant(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "success"})
 }
 
+// DeleteMerchant 删除商户（软删除；系统商户与仍有余额的商户不可删）
+func (h *AdminHandler) DeleteMerchant(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "无效的商户 ID"})
+		return
+	}
+
+	var merchant model.Merchant
+	if err := model.GetDB().First(&merchant, id).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "商户不存在"})
+		return
+	}
+	if merchant.PID == "SYSTEM" {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "系统商户不可删除"})
+		return
+	}
+	if merchant.Balance > 0 || merchant.FrozenBalance > 0 {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "商户仍有余额或冻结资金，请先清零后再删除"})
+		return
+	}
+
+	// 软删除其钱包与提现地址（避免残留归属）
+	model.GetDB().Where("merchant_id = ?", id).Delete(&model.Wallet{})
+	model.GetDB().Where("merchant_id = ?", id).Delete(&model.WithdrawAddress{})
+
+	if err := model.GetDB().Delete(&merchant).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "删除失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "商户已删除"})
+}
+
 // AdjustMerchantBalance 调整商户余额
 func (h *AdminHandler) AdjustMerchantBalance(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
@@ -722,6 +756,10 @@ func (h *AdminHandler) CreateWallet(c *gin.Context) {
 
 	if !util.IsValidChain(req.Chain) {
 		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "不支持的链类型"})
+		return
+	}
+	if !service.GetBlockchainService().IsChainEnabled(req.Chain) {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "该链路已禁用，请先在链监控中启用后再添加钱包"})
 		return
 	}
 

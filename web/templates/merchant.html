@@ -328,7 +328,7 @@
                 <div v-if="currentTab === 'wallets'" class="p-6 md:p-8">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-2xl font-bold" data-i18n="merchantPage.wallets.title">钱包管理</h2>
-                        <button @click="showWalletModal = true; editWallet = {chain: 'trc20', status: 1}"
+                        <button @click="openAddWallet"
                             class="m-btn m-btn-primary">
                             <i class="ri-add-line mr-2"></i><span data-i18n="wallet.addWallet">添加钱包</span>
                         </button>
@@ -875,18 +875,13 @@
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">链类型</label>
                         <select v-model="editWallet.chain" :disabled="editWallet.id" class="m-input">
-                            <option value="trx">TRX (Tron原生)</option>
-                            <option value="trc20">TRC20 (Tron USDT)</option>
-                            <option value="erc20">ERC20 (Ethereum)</option>
-                            <option value="bep20">BEP20 (BSC)</option>
-                            <option value="polygon">Polygon</option>
-                            <option value="optimism">Optimism</option>
-                            <option value="arbitrum">Arbitrum</option>
-                            <option value="avalanche">Avalanche</option>
-                            <option value="base">Base</option>
-                            <option value="wechat">微信支付</option>
-                            <option value="alipay">支付宝</option>
+                            <option v-for="c in enabledChains" :key="c.chain" :value="c.chain">
+                                [[ c.name || c.chain ]]
+                            </option>
                         </select>
+                        <p v-if="!editWallet.id && enabledChains.length === 0" class="text-red-500 text-xs mt-1">
+                            当前没有已启用的支付链路，请联系管理员在「链监控」中启用
+                        </p>
                     </div>
                     <div v-if="editWallet.chain !== 'wechat' && editWallet.chain !== 'alipay'">
                         <label class="block text-gray-700 text-sm font-bold mb-2">钱包地址</label>
@@ -1533,6 +1528,26 @@
                 }
             };
 
+            const enabledChains = computed(() => (chains.value || []).filter(c => c && c.enabled));
+
+            const openAddWallet = async () => {
+                if (!chains.value || chains.value.length === 0) {
+                    await loadChains();
+                }
+                const enabled = (chains.value || []).filter(c => c && c.enabled);
+                if (enabled.length === 0) {
+                    showToast('当前没有已启用的支付链路，无法添加钱包', 'error');
+                    return;
+                }
+                const preferred = ['trc20', 'trx', 'bep20', 'wechat', 'alipay'];
+                let def = enabled[0].chain;
+                for (const p of preferred) {
+                    if (enabled.some(c => c.chain === p)) { def = p; break; }
+                }
+                editWallet.value = { chain: def, status: 1, address: '', label: '', qrcode: '' };
+                showWalletModal.value = true;
+            };
+
             const editWalletFn = (wallet) => {
                 editWallet.value = { ...wallet };
                 showWalletModal.value = true;
@@ -1541,6 +1556,12 @@
             const saveWallet = async () => {
                 try {
                     const w = editWallet.value;
+                    if (!w.id) {
+                        if (!enabledChains.value.some(c => c.chain === w.chain)) {
+                            showToast('该链路已被禁用，无法添加', 'error');
+                            return;
+                        }
+                    }
                     let res;
                     if (w.id) {
                         res = await api.put(`/wallets/${w.id}`, w);
@@ -1555,7 +1576,7 @@
                         showToast(res.data.msg, 'error');
                     }
                 } catch (e) {
-                    showToast('保存失败', 'error');
+                    showToast(e.response?.data?.msg || '保存失败', 'error');
                 }
             };
 
@@ -1860,7 +1881,7 @@
             watch(currentTab, (tab) => {
                 if (tab === 'dashboard') loadDashboard();
                 else if (tab === 'orders') loadOrders();
-                else if (tab === 'wallets') loadWallets();
+                else if (tab === 'wallets') { loadWallets(); loadChains(); }
                 else if (tab === 'chains') loadChains();
                 else if (tab === 'apikey') loadApiKey();
                 else if (tab === 'withdraw') { loadBalance(); loadWithdrawals(); loadWithdrawAddresses(); loadRechargeAddresses(); }
@@ -1897,7 +1918,7 @@
                 isLoggedIn, mustChangePassword, loading, loginError, currentTab, merchant,
                 loginForm, forcePasswordForm, dashboard, orders, orderTotal, orderPage, orderFilter,
                 trendData, trendPeriod, trendPeriods, ordersChart, amountChart,
-                wallets, chains, apiKey, showKey, profile, passwordForm,
+                wallets, chains, enabledChains, apiKey, showKey, profile, passwordForm,
                 showWalletModal, editWallet, toast,
                 balance, withdrawals, withdrawForm, walletMode, feeRates,
                 withdrawAddresses, showAddressModal, editAddress, telegramBot, notifySettings,
@@ -1907,7 +1928,7 @@
                 login, logout, submitForcePassword, loadDashboard, loadOrders, confirmPayment, cancelOrder, createTestOrder, loadWallets, loadChains,
                 loadTrendData, loadApiKey, loadProfile, loadTelegramBot, loadNotifySettings, saveNotifySettings, loadMonitorConfig,
                 resetApiKey, updateProfile, changePassword,
-                editWalletFn, saveWallet, deleteWallet, uploadQRCode, copyToClipboard,
+                openAddWallet, editWalletFn, saveWallet, deleteWallet, uploadQRCode, copyToClipboard,
                 loadBalance, loadWithdrawals, submitWithdraw, loadRechargeAddresses,
                 loadWalletMode, saveWalletMode,
                 loadWithdrawAddresses, saveWithdrawAddress, setDefaultAddress, deleteWithdrawAddress,

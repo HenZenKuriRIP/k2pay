@@ -222,6 +222,7 @@ func registerRoutes(r *gin.Engine, cfg *config.Config) {
 		adminAPI.GET("/merchants", adminHandler.ListMerchants)
 		adminAPI.POST("/merchants", adminHandler.CreateMerchant)
 		adminAPI.PUT("/merchants/:id", adminHandler.UpdateMerchant)
+		adminAPI.DELETE("/merchants/:id", adminHandler.DeleteMerchant)
 		adminAPI.GET("/merchants/:id/key", adminHandler.GetMerchantKey)
 		adminAPI.POST("/merchants/:id/reset-key", adminHandler.ResetMerchantKey)
 		adminAPI.POST("/merchants/:id/balance", adminHandler.AdjustMerchantBalance)

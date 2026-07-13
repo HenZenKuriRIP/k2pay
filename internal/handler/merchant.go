@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/HenZenKuriRIP/k2pay/config"
@@ -650,6 +651,11 @@ func (h *MerchantHandler) CreateWallet(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "不支持的链类型"})
 		return
 	}
+	// 仅允许已启用的链（与管理员链监控状态一致）
+	if !service.GetBlockchainService().IsChainEnabled(req.Chain) {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "该支付方式/链路已被管理员禁用，无法添加钱包"})
+		return
+	}
 
 	// 法币收款特殊处理：使用二维码解析的地址，必须上传收款码
 	if util.IsFiatChain(req.Chain) {
@@ -853,22 +859,73 @@ func (h *MerchantHandler) UploadQRCode(c *gin.Context) {
 	})
 }
 
-// GetChainStatus 获取链状态 (只读)
+// GetChainStatus 获取链状态 (只读，含真实启用状态，供添加钱包筛选用)
 func (h *MerchantHandler) GetChainStatus(c *gin.Context) {
 	chainStatus := service.GetBlockchainService().GetChainStatus()
+	listenerStatus := service.GetBlockchainService().GetListenerStatus()
 
-	// 转换为列表格式，商户只能查看状态
-	chains := []gin.H{
-		{"chain": "trc20", "name": "TRC20 (Tron)", "enabled": chainStatus["trc20"]},
-		{"chain": "erc20", "name": "ERC20 (Ethereum)", "enabled": chainStatus["erc20"]},
-		{"chain": "bep20", "name": "BEP20 (BSC)", "enabled": chainStatus["bep20"]},
-		{"chain": "polygon", "name": "Polygon", "enabled": chainStatus["polygon"]},
-		{"chain": "optimism", "name": "Optimism", "enabled": chainStatus["optimism"]},
-		{"chain": "arbitrum", "name": "Arbitrum", "enabled": chainStatus["arbitrum"]},
-		{"chain": "avalanche", "name": "Avalanche", "enabled": chainStatus["avalanche"]},
-		{"chain": "base", "name": "Base", "enabled": chainStatus["base"]},
-		{"chain": "wechat", "name": "微信支付", "enabled": true},
-		{"chain": "alipay", "name": "支付宝", "enabled": true},
+	type meta struct {
+		Chain string
+		Name  string
+	}
+	order := []meta{
+		{"trx", "TRX (Tron原生)"},
+		{"trc20", "TRC20 (Tron USDT)"},
+		{"erc20", "ERC20 (Ethereum)"},
+		{"bep20", "BEP20 (BSC)"},
+		{"polygon", "Polygon"},
+		{"optimism", "Optimism"},
+		{"arbitrum", "Arbitrum"},
+		{"avalanche", "Avalanche"},
+		{"base", "Base"},
+		{"wechat", "微信支付"},
+		{"alipay", "支付宝"},
+	}
+
+	seen := map[string]bool{}
+	var chains []gin.H
+	for _, m := range order {
+		seen[m.Chain] = true
+		enabled := chainStatus[m.Chain]
+		// 优先 listener 里的展示名
+		name := m.Name
+		if info, ok := listenerStatus[m.Chain].(map[string]interface{}); ok {
+			if n, ok := info["name"].(string); ok && n != "" {
+				name = n
+			}
+			if e, ok := info["enabled"].(bool); ok {
+				enabled = e
+			}
+		}
+		chains = append(chains, gin.H{
+			"chain":   m.Chain,
+			"name":    name,
+			"enabled": enabled,
+		})
+	}
+	// 动态添加的自定义链
+	for chain, raw := range listenerStatus {
+		if seen[chain] {
+			continue
+		}
+		info, _ := raw.(map[string]interface{})
+		name := strings.ToUpper(chain)
+		enabled := false
+		if info != nil {
+			if n, ok := info["name"].(string); ok && n != "" {
+				name = n
+			}
+			if e, ok := info["enabled"].(bool); ok {
+				enabled = e
+			}
+		} else if v, ok := chainStatus[chain]; ok {
+			enabled = v
+		}
+		chains = append(chains, gin.H{
+			"chain":   chain,
+			"name":    name,
+			"enabled": enabled,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
