@@ -6,28 +6,31 @@
 
 ## 功能概览
 
-- 商户体系：管理员开户、`pid` / `key`、商户后台、余额与提现
-- 支付：`/api/pay/*` 下单 / 查单 / 退款（余额冲正）
-- 通道：链上 USDT/TRX、个人收款码、支付宝/微信官方 Native 扫码
-- 回调：异步 `notify_url`（MD5 签名 + 重试）、同步 `return_url`
-- 运维：systemd、一键安装（Nginx + 证书 + MySQL）
+- **商户体系**：管理员开户、`pid` / `key`、商户后台、余额与提现
+- **支付**：`/api/pay/*` 下单 / 查单 / 退款（余额冲正）
+- **通道**：链上 USDT/TRX、个人收款码、支付宝/微信官方 Native 扫码
+- **链监控**：管理端可添加/编辑/禁用链，RPC 热加载，健康度 **0–100 评分**
+- **官方支付**：支付宝当面付、微信 APIv3 Native；失败自动回退个人码
+- **运维**：仪表盘服务器指标（CPU/内存/磁盘/负载/DB 连接池）、systemd、一键安装
+- **技术栈**：**PostgreSQL**、Go 1.21+、嵌入式 Web 管理端/商户端
 
 ## 快速安装（Linux 服务器）
 
 ```bash
-# 一键安装：依赖 + MySQL + 二进制 + systemd + 干净 Nginx 反代 + HTTPS
+# 一键安装：依赖 + PostgreSQL + 二进制 + systemd + 干净 Nginx 反代 + HTTPS
 curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | \
   sudo bash -s -- --domain pay.example.com --email admin@example.com
 ```
 
 安装脚本会：
 
-1. 安装/启动 MySQL（MariaDB）与 Nginx  
-2. 下载 Release 二进制（无则源码编译）  
-3. **清理冲突的 Nginx 站点**（禁用 `default`、删除旧 k2pay 配置；**不删** `/etc/letsencrypt`）  
-4. 写入干净的 `k2pay` 站点配置：`proxy_pass` → `127.0.0.1:6088`  
-5. **若证书已存在** → 直接挂载 HTTPS；否则用 `certbot certonly --webroot` 申请后再写 HTTPS（**不用** `certbot --nginx`，避免改坏 default）  
-6. 配置 systemd 并启动  
+1. 安装/启动 **PostgreSQL** 与 Nginx  
+2. 创建数据库用户与库（凭证写入 `/etc/k2pay/db.credentials`）  
+3. 下载 Release 二进制（无则源码编译）  
+4. **清理冲突的 Nginx 站点**（禁用 `default`、删除旧 k2pay 配置；**不删** `/etc/letsencrypt`）  
+5. 写入干净的 `k2pay` 站点：`proxy_pass` → `127.0.0.1:6088`  
+6. **若证书已存在** → 直接挂载 HTTPS；否则 `certbot certonly --webroot` 申请后再写 HTTPS  
+7. 配置 systemd 并启动  
 
 | 参数 | 说明 |
 |------|------|
@@ -38,7 +41,7 @@ curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/in
 | `--keep-nginx` | 不清理其它站点，仅写 k2pay 配置 |
 | `--skip-cert` | 仅 HTTP 反代 |
 | `--skip-nginx` | 不装 Nginx |
-| `--version v1.0.0` | 指定 Release |
+| `--version v1.2.0` | 指定 Release |
 
 重装（例如证书已有、只修 Nginx）：
 
@@ -61,6 +64,49 @@ curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/un
 | 默认管理员 | `admin` / `admin123`（请立刻修改） |
 
 数据库密码见 `/etc/k2pay/db.credentials`。
+
+---
+
+## 配置要点
+
+配置文件：`/etc/k2pay/config.yaml` 或工作目录 `config.yaml`。
+
+### 数据库（PostgreSQL）
+
+```yaml
+database:
+  host: "127.0.0.1"
+  port: 5432
+  user: "k2pay"
+  password: "your-password"
+  dbname: "k2pay"
+  sslmode: "disable"   # disable / require / verify-full
+  max_open_conns: 100
+  max_idle_conns: 10
+  conn_max_lifetime: 60
+```
+
+- 首次启动自动 **AutoMigrate** 建表并写入默认数据  
+- **不支持直连 MySQL**；从旧版 MySQL 升级需自行迁移数据  
+- 数据目录：`/var/lib/k2pay`（上传文件、APK 等）
+
+### 官方支付
+
+管理后台 **系统设置 → 官方支付**：
+
+1. 填写 `site_url`（公网 HTTPS，如 `https://pay.example.com`）  
+2. 支付宝：模式选「官方」、AppID / 应用私钥 / 支付宝公钥  
+3. 微信：模式选「官方」、AppID / 商户号 / 证书序列号 / API 私钥 / APIv3 密钥  
+4. 保存后可用「测试连通」校验  
+5. 开放平台/商户平台回调地址：  
+   - `https://你的域名/api/channel/notify/alipay`  
+   - `https://你的域名/api/channel/notify/wechat`  
+
+法币默认个人收款码；改为「官方」后走开放平台扫码，失败时自动回退个人码。
+
+### 链监控
+
+管理后台 **链监控**：启用/禁用、编辑 RPC/扫描参数、添加 EVM 兼容链、健康度百分制检测。
 
 ---
 
@@ -306,13 +352,20 @@ pid=...&key=...&money=1.00&out_trade_no=A001
 ## 本地开发
 
 ```bash
-# 要求: Go 1.21+、MySQL 8+
+# 要求: Go 1.21+、PostgreSQL 14+
+# 准备数据库后修改 config.yaml 中 database 段
 go run .
 # 管理后台 http://127.0.0.1:6088/admin
+# 商户后台 http://127.0.0.1:6088/merchant
 ```
 
 ```bash
+# 编译当前平台
 CGO_ENABLED=0 go build -o k2pay .
+
+# 跨平台 Release 二进制（Linux）
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o k2pay-linux-amd64 .
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o k2pay-linux-arm64 .
 ```
 
 模块路径：`github.com/HenZenKuriRIP/k2pay`
@@ -321,24 +374,32 @@ CGO_ENABLED=0 go build -o k2pay .
 
 ```
 k2pay/
-├── main.go
-├── config/
+├── main.go                 # 入口与路由
+├── config/                 # 配置加载（含 PostgreSQL DSN）
+├── config.yaml             # 配置示例
 ├── internal/
-├── web/
+│   ├── handler/            # HTTP 处理器
+│   ├── service/            # 业务（订单、链监控、指标等）
+│   ├── model/              # 数据模型与 AutoMigrate
+│   ├── payment/            # 官方支付宝/微信驱动
+│   └── middleware/         # 鉴权与限流
+├── web/                    # 管理端 / 商户端 / 收银台模板与静态资源
 ├── scripts/
-│   ├── install.sh
+│   ├── install.sh          # 一键安装（PostgreSQL + Nginx）
 │   └── uninstall.sh
-├── db/
-└── config.yaml
+├── db/                     # 参考 SQL / 迁移说明
+└── release/                # 构建产物（本地）
 ```
 
-## 配置要点
+## Release
 
-- 配置：`/etc/k2pay/config.yaml` 或工作目录 `config.yaml`
-- 数据：`/var/lib/k2pay`
-- 官方支付：管理后台填写 `site_url` 与支付宝/微信密钥
-- 法币默认个人码；改为「官方」后走开放平台扫码
+最新版本见 [Releases](https://github.com/HenZenKuriRIP/k2pay/releases)。
 
+| 资产 | 说明 |
+|------|------|
+| `k2pay-linux-amd64.tar.gz` | Linux x86_64 |
+| `k2pay-linux-arm64.tar.gz` | Linux ARM64 |
+| `CHECKSUMS.txt` | SHA-256 |
 
 ## License
 
