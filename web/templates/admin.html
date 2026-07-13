@@ -1107,10 +1107,35 @@
     <script>
         let token = localStorage.getItem('admin_token');
 
-        // Check auth
-        if (token) {
-            showApp();
-        }
+        // 启动：有本地 token 必须先向服务端校验（避免重装后脏 token「假登录」）
+        (async function bootstrapAuth() {
+            if (!token) return;
+            try {
+                const res = await fetch('/admin/api/dashboard', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                let data = {};
+                try { data = await res.json(); } catch (_) {}
+
+                if (res.status === 401 || data.msg === '未登录' || data.msg === 'Token无效或已过期') {
+                    clearAuth(false);
+                    return;
+                }
+                if (res.status === 403 || data.code === -2 || data.must_change_password) {
+                    showForcePassword();
+                    return;
+                }
+                if (data.code === 1) {
+                    showApp();
+                    return;
+                }
+                // 其它异常：清 token 回登录，避免空壳后台
+                clearAuth(false);
+            } catch (_) {
+                // 网络异常时不自动进后台
+                clearAuth(false);
+            }
+        })();
 
         // Login
         async function login(e) {
@@ -1141,9 +1166,17 @@
             }
         }
 
-        function logout() {
+        function clearAuth(reload) {
+            token = null;
             localStorage.removeItem('admin_token');
-            location.reload();
+            document.getElementById('appContainer').style.display = 'none';
+            document.getElementById('forcePasswordContainer').style.display = 'none';
+            document.getElementById('loginContainer').style.display = 'flex';
+            if (reload) location.reload();
+        }
+
+        function logout() {
+            clearAuth(true);
         }
 
         function showForcePassword() {
@@ -1240,19 +1273,31 @@
                 const res = await fetch(url, {
                     ...options,
                     headers: {
-                        'Authorization': 'Bearer ' + token,
+                        'Authorization': 'Bearer ' + (token || ''),
                         'Content-Type': 'application/json',
                         ...options.headers
                     }
                 });
-                if (!res.ok) {
-                    return { code: -1, msg: `HTTP ${res.status}: ${res.statusText}` };
+                let data = {};
+                try {
+                    data = await res.json();
+                } catch (_) {
+                    data = { code: -1, msg: `HTTP ${res.status}: ${res.statusText}` };
                 }
-                const data = await res.json();
-                if (data.code === -1 && (data.msg === '未登录' || data.msg === 'Token无效或已过期')) {
-                    logout();
+
+                // 401/无效 token：清本地缓存并回登录（重装后旧 JWT 会走这里）
+                const unauthorized =
+                    res.status === 401 ||
+                    data.msg === '未登录' ||
+                    data.msg === 'Token无效或已过期' ||
+                    data.msg === 'Token格式错误';
+                if (unauthorized) {
+                    clearAuth(false);
+                    return data.code != null ? data : { code: -1, msg: data.msg || '未登录' };
                 }
-                if (data.code === -2 || data.must_change_password) {
+
+                // 强制改密
+                if (res.status === 403 || data.code === -2 || data.must_change_password) {
                     showForcePassword();
                 }
                 return data;

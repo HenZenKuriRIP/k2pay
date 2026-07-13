@@ -1867,14 +1867,29 @@
                 else if (tab === 'settings') { loadProfile(); loadWalletMode(); loadWithdrawAddresses(); loadTelegramBot(); loadApiKey(); loadNotifySettings(); loadMonitorConfig(); }
             });
 
-            onMounted(() => {
+            onMounted(async () => {
                 const savedToken = localStorage.getItem('merchant_token');
                 const savedMerchant = localStorage.getItem('merchant_info');
-                if (savedToken && savedMerchant) {
-                    token.value = savedToken;
-                    merchant.value = JSON.parse(savedMerchant);
-                    isLoggedIn.value = true;
-                    loadDashboard();
+                if (!savedToken || !savedMerchant) return;
+                token.value = savedToken;
+                try {
+                    // 先校验 token，避免重装后脏 JWT「假登录」
+                    const res = await api.get('/dashboard');
+                    if (res.data && res.data.code === 1) {
+                        try { merchant.value = JSON.parse(savedMerchant); } catch (_) { merchant.value = {}; }
+                        isLoggedIn.value = true;
+                        dashboard.value = res.data.data || {};
+                        loadTrendData();
+                    } else if (res.data && (res.data.code === -2 || res.data.must_change_password)) {
+                        try { merchant.value = JSON.parse(savedMerchant); } catch (_) {}
+                        isLoggedIn.value = true;
+                        mustChangePassword.value = true;
+                    } else {
+                        logout();
+                    }
+                } catch (_) {
+                    // 401 等由 interceptor 清会话
+                    if (token.value) logout();
                 }
             });
 
