@@ -17,38 +17,20 @@
 ## 快速安装（Linux 服务器）
 
 ```bash
-# 交互安装（会提示输入域名；邮箱默认 admin@k2pay.com）
-curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | sudo bash
+# 安装 / 重装
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
 
-# 或指定参数
-curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | \
-  sudo bash -s -- --domain pay.example.com --email admin@example.com
+# 指定域名
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh) --domain pay.example.com
+
+# 卸载
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh)
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh) -y
 ```
 
-安装脚本会（步骤清晰、输出精简）：
+> 用 `sudo bash <(curl …)`，不要用 `curl | sudo bash`（管道会占掉 stdin，确认提示会直接取消）。
 
-1. 安装 **PostgreSQL** / Nginx / Certbot  
-2. 通过 **ufw/firewalld** 放行 80/443（证书申请需要）  
-3. 创建数据库与用户，下载二进制并配置 systemd  
-4. 写入 Nginx 反代；有证书则挂载 HTTPS，否则自动申请  
-
-| 参数 | 说明 |
-|------|------|
-| `--domain` | 域名（也可交互输入；留空则仅本机 `6088`） |
-| `--email` | Let's Encrypt 邮箱（默认 `admin@k2pay.com`） |
-| `--version` | Release 标签，默认 `latest` |
-| `--skip-https` | 不申请 HTTPS |
-| `--no-nginx` | 不装 Nginx |
-
-重装：再次运行同一安装脚本即可（会覆盖二进制并重写 Nginx）。
-
-卸载（默认**保留**数据库、配置与证书）：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh | sudo bash
-# 跳过确认:  ... | sudo bash -s -- -y
-# 全清数据:  ... | sudo bash -s -- --purge-all -y
-```
+可选参数：`--domain` / `--email`（默认 `admin@k2pay.com`）/ `--version` / `--skip-https` / `--no-nginx`；卸载加 `--purge-all` 可清库。
 
 | 入口 | 地址 |
 |------|------|

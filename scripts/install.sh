@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
-# =============================================================================
-# K2Pay 安装脚本（安装 / 重装 共用）
-# =============================================================================
-# 用法:
-#   curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | sudo bash
-#   sudo bash install.sh
-#   sudo bash install.sh --domain pay.example.com --email admin@example.com
-#   sudo bash install.sh --version v1.2.0
-# =============================================================================
+# K2Pay 安装 / 重装
+#   sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
+#   sudo bash <(curl -fsSL .../install.sh) --domain pay.example.com
 set -euo pipefail
 
 REPO="HenZenKuriRIP/k2pay"
@@ -26,7 +20,6 @@ VERSION="latest"
 SKIP_HTTPS=0
 NO_NGINX=0
 
-# ---- 样式 ----
 C0='\033[0m'; C1='\033[1;36m'; C2='\033[1;32m'; C3='\033[1;33m'; C4='\033[1;31m'
 step()  { echo -e "\n${C1}▸ $*${C0}"; }
 ok()    { echo -e "  ${C2}✓${C0} $*"; }
@@ -34,19 +27,32 @@ warn()  { echo -e "  ${C3}!${C0} $*"; }
 die()   { echo -e "  ${C4}✗ $*${C0}" >&2; exit 1; }
 quiet() { "$@" >/dev/null 2>&1; }
 
+# curl|bash / process substitution 时 stdin 非终端，交互从 /dev/tty 读
+ask() {
+  local prompt="$1" out
+  if [[ -r /dev/tty ]]; then
+    read -rp "$prompt" out < /dev/tty || true
+  elif [[ -t 0 ]]; then
+    read -rp "$prompt" out || true
+  else
+    out=""
+  fi
+  REPLY="$out"
+}
+
 usage() {
   cat <<EOF
-K2Pay 安装脚本
+K2Pay 安装
 
-  sudo bash install.sh [选项]
+  sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
+  sudo bash <(curl -fsSL .../install.sh) --domain pay.example.com
 
 选项:
-  --domain FQDN     域名（不传则交互询问）
-  --email EMAIL     Let's Encrypt 邮箱（默认 admin@k2pay.com）
-  --version TAG     Release 版本，默认 latest
-  --skip-https      不申请/挂载 HTTPS
-  --no-nginx        不安装 Nginx，仅本机 :${APP_PORT}
-  -h, --help        帮助
+  --domain FQDN     域名（不传则询问）
+  --email EMAIL     证书邮箱（默认 admin@k2pay.com）
+  --version TAG     默认 latest
+  --skip-https      不要 HTTPS
+  --no-nginx        仅本机 :${APP_PORT}
 EOF
 }
 
@@ -62,7 +68,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ "$(id -u)" -eq 0 ]] || die "请使用 root 运行: sudo bash $0"
+[[ "$(id -u)" -eq 0 ]] || die "请加 sudo: sudo bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh)"
 [[ "$(uname -s)" == "Linux" ]] || die "仅支持 Linux"
 
 ARCH="$(uname -m)"
@@ -85,24 +91,22 @@ echo "║           K2Pay Installer            ║"
 echo "╚══════════════════════════════════════╝"
 echo -e "${C0}"
 
-# ---- 交互输入 ----
+# ---- 交互输入（兼容 curl|bash，从 /dev/tty 读取）----
 if [[ "$NO_NGINX" -eq 0 && -z "${DOMAIN}" ]]; then
-  if [[ -t 0 ]]; then
-    read -rp "请输入域名（直接回车 = 仅本机访问，跳过 Nginx/HTTPS）: " DOMAIN || true
-  fi
-  if [[ -z "${DOMAIN:-}" ]]; then
+  ask "域名（回车 = 仅本机访问）: "
+  DOMAIN="${REPLY:-}"
+  if [[ -z "${DOMAIN}" ]]; then
     NO_NGINX=1
     SKIP_HTTPS=1
-    warn "未填写域名，将仅监听 127.0.0.1:${APP_PORT}"
+    warn "未填域名，仅监听 127.0.0.1:${APP_PORT}"
   fi
 fi
 
-if [[ "$SKIP_HTTPS" -eq 0 && -n "${DOMAIN:-}" ]]; then
-  if [[ -z "${EMAIL}" && -t 0 ]]; then
-    read -rp "Let's Encrypt 邮箱 [admin@k2pay.com]: " EMAIL || true
-  fi
-  EMAIL="${EMAIL:-admin@k2pay.com}"
+if [[ "$SKIP_HTTPS" -eq 0 && -n "${DOMAIN:-}" && -z "${EMAIL}" ]]; then
+  ask "证书邮箱 [admin@k2pay.com]: "
+  EMAIL="${REPLY:-admin@k2pay.com}"
 fi
+EMAIL="${EMAIL:-admin@k2pay.com}"
 
 # ---- 1. 依赖 ----
 step "安装系统依赖"
@@ -512,5 +516,5 @@ else
 fi
 echo "  默认账号:  admin / admin123  ← 请立即修改"
 echo
-echo "  卸载: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh | sudo bash"
+echo "  卸载: sudo bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh)"
 echo
