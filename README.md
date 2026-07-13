@@ -17,44 +17,37 @@
 ## 快速安装（Linux 服务器）
 
 ```bash
-# 一键安装：依赖 + PostgreSQL + 二进制 + systemd + 干净 Nginx 反代 + HTTPS
+# 交互安装（会提示输入域名；邮箱默认 admin@k2pay.com）
+curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | sudo bash
+
+# 或指定参数
 curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | \
   sudo bash -s -- --domain pay.example.com --email admin@example.com
 ```
 
-安装脚本会：
+安装脚本会（步骤清晰、输出精简）：
 
-1. 安装/启动 **PostgreSQL** 与 Nginx  
-2. 创建数据库用户与库（凭证写入 `/etc/k2pay/db.credentials`）  
-3. 下载 Release 二进制（无则源码编译）  
-4. **清理冲突的 Nginx 站点**（禁用 `default`、删除旧 k2pay 配置；**不删** `/etc/letsencrypt`）  
-5. 写入干净的 `k2pay` 站点：`proxy_pass` → `127.0.0.1:6088`  
-6. **若证书已存在** → 直接挂载 HTTPS；否则 `certbot certonly --webroot` 申请后再写 HTTPS  
-7. 配置 systemd 并启动  
+1. 安装 **PostgreSQL** / Nginx / Certbot  
+2. 通过 **ufw/firewalld** 放行 80/443（证书申请需要）  
+3. 创建数据库与用户，下载二进制并配置 systemd  
+4. 写入 Nginx 反代；有证书则挂载 HTTPS，否则自动申请  
 
 | 参数 | 说明 |
 |------|------|
-| `--domain` | 域名（强烈建议） |
-| `--email` | 申请证书邮箱（已有证书可省略） |
-| `--reinstall` | 重装：覆盖二进制并重写 Nginx |
-| `--reset-nginx` | 清理冲突站点（**默认开启**） |
-| `--keep-nginx` | 不清理其它站点，仅写 k2pay 配置 |
-| `--skip-cert` | 仅 HTTP 反代 |
-| `--skip-nginx` | 不装 Nginx |
-| `--version v1.2.0` | 指定 Release |
+| `--domain` | 域名（也可交互输入；留空则仅本机 `6088`） |
+| `--email` | Let's Encrypt 邮箱（默认 `admin@k2pay.com`） |
+| `--version` | Release 标签，默认 `latest` |
+| `--skip-https` | 不申请 HTTPS |
+| `--no-nginx` | 不装 Nginx |
 
-重装（例如证书已有、只修 Nginx）：
+重装：再次运行同一安装脚本即可（会覆盖二进制并重写 Nginx）。
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | \
-  sudo bash -s -- --domain pay.example.com --reinstall
-```
-
-卸载（**保留数据库与域名证书**）：
+卸载（默认**保留**数据库、配置与证书）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh | sudo bash
-# 跳过确认: ... | sudo bash -s -- --force
+# 跳过确认:  ... | sudo bash -s -- -y
+# 全清数据:  ... | sudo bash -s -- --purge-all -y
 ```
 
 | 入口 | 地址 |

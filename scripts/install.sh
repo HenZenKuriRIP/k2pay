@@ -1,193 +1,225 @@
 #!/usr/bin/env bash
-# K2Pay 一键安装 / 重装
-# - 拉取二进制、PostgreSQL、systemd
-# - 清空冲突的 Nginx 站点配置后写入干净反代
-# - 若已有 Let's Encrypt 证书则直接挂载；否则自动申请
-# - 不使用 certbot --nginx（避免改写 default 导致 301 死循环）
-#
+# =============================================================================
+# K2Pay 安装脚本（安装 / 重装 共用）
+# =============================================================================
 # 用法:
-#   curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | \
-#     sudo bash -s -- --domain pay.example.com --email you@example.com
-#   sudo bash scripts/install.sh --domain pay.example.com --email you@example.com
-#   sudo bash scripts/install.sh --domain pay.example.com --reset-nginx
+#   curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | sudo bash
+#   sudo bash install.sh
+#   sudo bash install.sh --domain pay.example.com --email admin@example.com
+#   sudo bash install.sh --version v1.2.0
+# =============================================================================
 set -euo pipefail
 
 REPO="HenZenKuriRIP/k2pay"
-INSTALL_DIR="/opt/k2pay"
-DATA_DIR="/var/lib/k2pay"
-CONF_DIR="/etc/k2pay"
 BIN_PATH="/usr/local/bin/k2pay"
+CONF_DIR="/etc/k2pay"
+DATA_DIR="/var/lib/k2pay"
 SERVICE_FILE="/etc/systemd/system/k2pay.service"
+WEBROOT="/var/www/k2pay-acme"
+APP_PORT="6088"
 DB_NAME="k2pay"
 DB_USER="k2pay"
-HTTP_PORT="6088"
-WEBROOT="/var/www/k2pay-acme"
 
 DOMAIN=""
 EMAIL=""
-SKIP_CERT=0
-SKIP_NGINX=0
-RESET_NGINX=1   # 默认重置 Nginx 站点配置（真正一键、避免 default 冲突）
 VERSION="latest"
-REINSTALL=0
+SKIP_HTTPS=0
+NO_NGINX=0
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
-info() { echo -e "${GREEN}[INFO]${NC} $*"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-die()  { echo -e "${RED}[ERR]${NC} $*" >&2; exit 1; }
+# ---- 样式 ----
+C0='\033[0m'; C1='\033[1;36m'; C2='\033[1;32m'; C3='\033[1;33m'; C4='\033[1;31m'
+step()  { echo -e "\n${C1}▸ $*${C0}"; }
+ok()    { echo -e "  ${C2}✓${C0} $*"; }
+warn()  { echo -e "  ${C3}!${C0} $*"; }
+die()   { echo -e "  ${C4}✗ $*${C0}" >&2; exit 1; }
+quiet() { "$@" >/dev/null 2>&1; }
+
+usage() {
+  cat <<EOF
+K2Pay 安装脚本
+
+  sudo bash install.sh [选项]
+
+选项:
+  --domain FQDN     域名（不传则交互询问）
+  --email EMAIL     Let's Encrypt 邮箱（默认 admin@k2pay.com）
+  --version TAG     Release 版本，默认 latest
+  --skip-https      不申请/挂载 HTTPS
+  --no-nginx        不安装 Nginx，仅本机 :${APP_PORT}
+  -h, --help        帮助
+EOF
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --domain) DOMAIN="${2:-}"; shift 2 ;;
-    --email) EMAIL="${2:-}"; shift 2 ;;
+    --email)  EMAIL="${2:-}"; shift 2 ;;
     --version) VERSION="${2:-}"; shift 2 ;;
-    --skip-cert) SKIP_CERT=1; shift ;;
-    --skip-nginx) SKIP_NGINX=1; shift ;;
-    --reset-nginx) RESET_NGINX=1; shift ;;
-    --keep-nginx) RESET_NGINX=0; shift ;;
-    --reinstall) REINSTALL=1; shift ;;
-    -h|--help)
-      cat <<EOF
-Usage: $0 [options]
-  --domain FQDN       站点域名（强烈建议提供）
-  --email EMAIL       Let's Encrypt 邮箱
-  --version TAG       Release 版本，默认 latest
-  --skip-cert         不申请/不挂载 HTTPS
-  --skip-nginx        不配置 Nginx
-  --reset-nginx       清空冲突站点并重写 Nginx（默认开启）
-  --keep-nginx        不清理其它站点，仅写入 k2pay 配置
-  --reinstall         重装：停旧服务、覆盖二进制、重写 Nginx
-EOF
-      exit 0 ;;
-    *) die "未知参数: $1" ;;
+    --skip-https) SKIP_HTTPS=1; shift ;;
+    --no-nginx) NO_NGINX=1; SKIP_HTTPS=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "未知参数: $1 （见 --help）" ;;
   esac
 done
 
-[[ "$(id -u)" -eq 0 ]] || die "请使用 root: sudo bash $0"
-
-if [[ -z "$DOMAIN" && "$SKIP_NGINX" -eq 0 ]]; then
-  if [[ -t 0 ]]; then
-    read -rp "域名 (必填才能自动配置 HTTPS，留空则仅本机 6088): " DOMAIN || true
-  fi
-  if [[ -z "${DOMAIN:-}" ]]; then
-    SKIP_NGINX=1
-    SKIP_CERT=1
-    warn "未提供域名，跳过 Nginx/证书"
-  fi
-fi
-if [[ -n "${DOMAIN:-}" && "$SKIP_CERT" -eq 0 && -z "${EMAIL:-}" ]]; then
-  if [[ -t 0 ]]; then
-    read -rp "Let's Encrypt 邮箱 (证书不存在时需要；已有证书可回车跳过): " EMAIL || true
-  fi
-fi
+[[ "$(id -u)" -eq 0 ]] || die "请使用 root 运行: sudo bash $0"
+[[ "$(uname -s)" == "Linux" ]] || die "仅支持 Linux"
 
 ARCH="$(uname -m)"
 case "$ARCH" in
   x86_64|amd64) GOARCH=amd64 ;;
   aarch64|arm64) GOARCH=arm64 ;;
-  *) die "不支持架构: $ARCH" ;;
+  *) die "不支持的架构: $ARCH" ;;
 esac
-[[ "$(uname -s)" == "Linux" ]] || die "仅支持 Linux"
 
 if command -v apt-get >/dev/null 2>&1; then PKG=apt
 elif command -v dnf >/dev/null 2>&1; then PKG=dnf
 elif command -v yum >/dev/null 2>&1; then PKG=yum
-else die "需要 apt/dnf/yum"; fi
+else die "需要 apt / dnf / yum"; fi
 
-# ---------- 重装：先停服务 ----------
-if [[ "$REINSTALL" -eq 1 ]] || systemctl is-active --quiet k2pay 2>/dev/null; then
-  info "停止已有 k2pay 服务..."
-  systemctl stop k2pay 2>/dev/null || true
-fi
-
-# ---------- 依赖 ----------
 export DEBIAN_FRONTEND=noninteractive
-info "安装系统依赖..."
-if [[ "$PKG" == "apt" ]]; then
-  apt-get update -y
-  apt-get install -y curl ca-certificates tar gzip openssl python3 file
-  if ! command -v psql >/dev/null 2>&1; then
-    apt-get install -y postgresql postgresql-contrib
+
+echo -e "${C1}"
+echo "╔══════════════════════════════════════╗"
+echo "║           K2Pay Installer            ║"
+echo "╚══════════════════════════════════════╝"
+echo -e "${C0}"
+
+# ---- 交互输入 ----
+if [[ "$NO_NGINX" -eq 0 && -z "${DOMAIN}" ]]; then
+  if [[ -t 0 ]]; then
+    read -rp "请输入域名（直接回车 = 仅本机访问，跳过 Nginx/HTTPS）: " DOMAIN || true
   fi
-  systemctl enable --now postgresql 2>/dev/null || systemctl enable --now postgresql@* 2>/dev/null || true
-  if [[ "$SKIP_NGINX" -eq 0 ]]; then
-    apt-get install -y nginx
-    systemctl enable --now nginx
-    apt-get install -y certbot 2>/dev/null || true
-  fi
-else
-  $PKG install -y curl tar gzip openssl python3 file
-  $PKG install -y postgresql postgresql-contrib 2>/dev/null || $PKG install -y postgresql-server 2>/dev/null || true
-  systemctl enable --now postgresql 2>/dev/null || true
-  if [[ "$SKIP_NGINX" -eq 0 ]]; then
-    $PKG install -y nginx
-    systemctl enable --now nginx
-    $PKG install -y certbot 2>/dev/null || true
+  if [[ -z "${DOMAIN:-}" ]]; then
+    NO_NGINX=1
+    SKIP_HTTPS=1
+    warn "未填写域名，将仅监听 127.0.0.1:${APP_PORT}"
   fi
 fi
 
-# ---------- 数据库 (PostgreSQL) ----------
-info "配置 PostgreSQL..."
+if [[ "$SKIP_HTTPS" -eq 0 && -n "${DOMAIN:-}" ]]; then
+  if [[ -z "${EMAIL}" && -t 0 ]]; then
+    read -rp "Let's Encrypt 邮箱 [admin@k2pay.com]: " EMAIL || true
+  fi
+  EMAIL="${EMAIL:-admin@k2pay.com}"
+fi
+
+# ---- 1. 依赖 ----
+step "安装系统依赖"
+pkg_install() {
+  if [[ "$PKG" == "apt" ]]; then
+    quiet apt-get update -y || true
+    quiet apt-get install -y "$@"
+  else
+    quiet $PKG install -y "$@" || true
+  fi
+}
+
+pkg_install curl ca-certificates tar gzip openssl python3 file
+command -v curl >/dev/null || die "curl 安装失败"
+
+if ! command -v psql >/dev/null 2>&1; then
+  if [[ "$PKG" == "apt" ]]; then
+    quiet apt-get install -y postgresql postgresql-contrib
+  else
+    quiet $PKG install -y postgresql postgresql-contrib || quiet $PKG install -y postgresql-server
+  fi
+fi
+quiet systemctl enable --now postgresql || quiet systemctl enable --now postgresql@* || true
+ok "PostgreSQL"
+
+if [[ "$NO_NGINX" -eq 0 ]]; then
+  command -v nginx >/dev/null 2>&1 || pkg_install nginx
+  quiet systemctl enable --now nginx || true
+  ok "Nginx"
+  if [[ "$SKIP_HTTPS" -eq 0 ]]; then
+    command -v certbot >/dev/null 2>&1 || pkg_install certbot
+    ok "Certbot"
+  fi
+fi
+
+# ---- 2. 防火墙（证书需要 80）----
+if [[ "$NO_NGINX" -eq 0 ]]; then
+  step "开放防火墙端口"
+  if command -v ufw >/dev/null 2>&1; then
+    quiet ufw allow 80/tcp || true
+    quiet ufw allow 443/tcp || true
+    # 若 ufw 未启用则不强行 enable，避免锁死 SSH
+    if ufw status 2>/dev/null | grep -qi "Status: active"; then
+      ok "ufw: 已放行 80/443"
+    else
+      warn "ufw 未启用；若云厂商有安全组，请手动放行 80/443"
+    fi
+  elif command -v firewall-cmd >/dev/null 2>&1; then
+    quiet firewall-cmd --permanent --add-service=http || true
+    quiet firewall-cmd --permanent --add-service=https || true
+    quiet firewall-cmd --reload || true
+    ok "firewalld: 已放行 http/https"
+  else
+    warn "未检测到 ufw/firewalld，请确认 80/443 可从公网访问"
+  fi
+fi
+
+# ---- 3. 数据库 ----
+step "配置 PostgreSQL"
 DB_PASS=""
 if [[ -f "$CONF_DIR/db.credentials" ]]; then
-  # 重装保留原数据库密码
   # shellcheck disable=SC1090
   source "$CONF_DIR/db.credentials" 2>/dev/null || true
-  DB_PASS="${DB_PASS:-}"
 fi
-if [[ -z "$DB_PASS" ]]; then
+if [[ -z "${DB_PASS:-}" ]]; then
   DB_PASS="$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 20)"
 fi
 
-pg_as_postgres() {
-  if command -v sudo >/dev/null 2>&1 && id postgres >/dev/null 2>&1; then
+pg() {
+  if id postgres >/dev/null 2>&1; then
     sudo -u postgres "$@"
   else
     "$@"
   fi
 }
 
-# 创建角色与数据库（幂等）
-pg_as_postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1 \
-  || pg_as_postgres psql -v ON_ERROR_STOP=1 -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" \
-  || die "无法创建 PostgreSQL 用户 ${DB_USER}"
-# 更新密码（重装时）
-pg_as_postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" >/dev/null 2>&1 || true
-pg_as_postgres psql -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1 \
-  || pg_as_postgres psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};" \
-  || die "无法创建 PostgreSQL 数据库 ${DB_NAME}"
-pg_as_postgres psql -v ON_ERROR_STOP=1 -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${DB_USER};" >/dev/null 2>&1 || true
-pg_as_postgres psql -v ON_ERROR_STOP=1 -d "${DB_NAME}" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};" >/dev/null 2>&1 || true
-
-# 验证连接
-export PGPASSWORD="${DB_PASS}"
-if ! psql -h 127.0.0.1 -U "${DB_USER}" -d "${DB_NAME}" -c 'SELECT 1;' >/dev/null 2>&1; then
-  # 部分发行版仅 socket 信任
-  if ! pg_as_postgres psql -d "${DB_NAME}" -c 'SELECT 1;' >/dev/null 2>&1; then
-    die "PostgreSQL 用户/数据库连接失败，请检查 pg_hba.conf 与服务状态"
-  fi
-  warn "TCP 认证可能未放行，已通过本地 socket 验证数据库存在；请确保 config 使用 host=127.0.0.1 且 pg_hba 允许 md5/scram"
+if ! pg psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" 2>/dev/null | grep -q 1; then
+  pg psql -v ON_ERROR_STOP=1 -c "CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" \
+    || die "创建数据库用户失败"
+else
+  pg psql -c "ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';" >/dev/null 2>&1 || true
 fi
-unset PGPASSWORD
 
-# ---------- 二进制 ----------
-info "获取 K2Pay 二进制 (linux-${GOARCH})..."
+if ! pg psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" 2>/dev/null | grep -q 1; then
+  pg psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};" \
+    || die "创建数据库失败"
+fi
+pg psql -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${DB_USER};" >/dev/null 2>&1 || true
+pg psql -d "${DB_NAME}" -c "ALTER DATABASE ${DB_NAME} OWNER TO ${DB_USER};" >/dev/null 2>&1 || true
+
+# 允许本机密码登录（若 pg_hba 仅 peer，TCP 会失败）
+PG_HBA="$(pg psql -tAc 'SHOW hba_file' 2>/dev/null | tr -d '[:space:]' || true)"
+if [[ -n "$PG_HBA" && -f "$PG_HBA" ]]; then
+  if ! grep -qE "host\s+${DB_NAME}\s+${DB_USER}\s+127\.0\.0\.1/32" "$PG_HBA" 2>/dev/null; then
+    echo "host ${DB_NAME} ${DB_USER} 127.0.0.1/32 scram-sha-256" >> "$PG_HBA"
+    echo "host ${DB_NAME} ${DB_USER} ::1/128 scram-sha-256" >> "$PG_HBA"
+    quiet systemctl reload postgresql || quiet systemctl reload postgresql@* || true
+  fi
+fi
+ok "数据库 ${DB_NAME} / 用户 ${DB_USER}"
+
+# ---- 4. 下载二进制 ----
+step "获取 K2Pay 程序 (${GOARCH})"
+systemctl stop k2pay 2>/dev/null || true
+
 TMPDIR="$(mktemp -d)"
-cleanup() { rm -rf "$TMPDIR"; }
-trap cleanup EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
-fetch_binary() {
-  local tag="$1"
-  local urls=(
-    "https://github.com/${REPO}/releases/download/${tag}/k2pay-linux-${GOARCH}.tar.gz"
+fetch_bin() {
+  local tag="$1" u f
+  for u in \
+    "https://github.com/${REPO}/releases/download/${tag}/k2pay-linux-${GOARCH}.tar.gz" \
     "https://github.com/${REPO}/releases/download/${tag}/k2pay-linux-${GOARCH}"
-  )
-  local u
-  for u in "${urls[@]}"; do
+  do
     if curl -fsSL "$u" -o "$TMPDIR/dl" 2>/dev/null; then
-      if file "$TMPDIR/dl" 2>/dev/null | grep -qiE 'gzip|tar archive'; then
+      if file "$TMPDIR/dl" 2>/dev/null | grep -qiE 'gzip|tar'; then
         tar -xzf "$TMPDIR/dl" -C "$TMPDIR"
-        local f
         f="$(find "$TMPDIR" -type f -name 'k2pay*' ! -name '*.tar.gz' ! -name '*.tgz' | head -1)"
         [[ -n "$f" ]] && cp "$f" "$TMPDIR/k2pay" && return 0
       else
@@ -198,48 +230,45 @@ fetch_binary() {
   return 1
 }
 
-GOT=0
+TAG="$VERSION"
 if [[ "$VERSION" == "latest" ]]; then
   TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
     | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null || true)"
-  if [[ -n "$TAG" ]] && fetch_binary "$TAG"; then GOT=1; info "已下载 Release ${TAG}"; fi
-else
-  fetch_binary "$VERSION" && GOT=1 && info "已下载 Release ${VERSION}"
 fi
 
-if [[ "$GOT" -ne 1 ]]; then
-  warn "Release 无可用二进制，从源码编译..."
-  if ! command -v go >/dev/null 2>&1; then
-    if [[ "$PKG" == "apt" ]]; then apt-get install -y golang-go git
-    else $PKG install -y golang git; fi
-  fi
-  command -v git >/dev/null 2>&1 || { [[ "$PKG" == "apt" ]] && apt-get install -y git || $PKG install -y git; }
-  git clone --depth 1 "https://github.com/${REPO}.git" "$TMPDIR/src"
+if [[ -n "${TAG:-}" ]] && fetch_bin "$TAG"; then
+  ok "已下载 Release ${TAG}"
+else
+  warn "Release 不可用，尝试从源码编译…"
+  command -v go >/dev/null 2>&1 || pkg_install golang-go git || pkg_install golang git
+  command -v git >/dev/null 2>&1 || pkg_install git
+  git clone --depth 1 "https://github.com/${REPO}.git" "$TMPDIR/src" >/dev/null 2>&1 \
+    || die "克隆源码失败"
   (
     cd "$TMPDIR/src"
-    CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=$(git describe --tags --always 2>/dev/null || echo dev)" -o "$TMPDIR/k2pay" .
-  ) || die "源码编译失败。请发布 Release: k2pay-linux-${GOARCH}.tar.gz"
+    CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=$(git describe --tags --always 2>/dev/null || echo dev)" \
+      -o "$TMPDIR/k2pay" .
+  ) || die "编译失败"
+  ok "源码编译完成"
 fi
 
-[[ -f "$TMPDIR/k2pay" ]] || die "未找到二进制文件"
+[[ -f "$TMPDIR/k2pay" ]] || die "未找到二进制"
 chmod +x "$TMPDIR/k2pay"
-mkdir -p "$INSTALL_DIR" "$DATA_DIR/qrcode" "$DATA_DIR/apk" "$CONF_DIR"
 install -m 755 "$TMPDIR/k2pay" "$BIN_PATH"
 id k2pay &>/dev/null || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin k2pay
-chown -R k2pay:k2pay "$DATA_DIR" "$INSTALL_DIR"
+mkdir -p "$DATA_DIR/qrcode" "$DATA_DIR/apk" "$CONF_DIR"
+chown -R k2pay:k2pay "$DATA_DIR"
+ok "安装到 ${BIN_PATH}"
 
-# ---------- 应用配置 ----------
+# ---- 5. 配置文件 ----
+step "写入配置"
 JWT_SECRET="$(openssl rand -hex 32)"
-if [[ ! -f "$CONF_DIR/config.yaml" ]] || [[ "$REINSTALL" -eq 1 && ! -f "$CONF_DIR/config.yaml" ]]; then
-  :
-fi
 if [[ ! -f "$CONF_DIR/config.yaml" ]]; then
-  info "写入 ${CONF_DIR}/config.yaml"
   cat > "$CONF_DIR/config.yaml" <<EOF
 # K2Pay — generated by install.sh
 server:
   host: "127.0.0.1"
-  port: ${HTTP_PORT}
+  port: ${APP_PORT}
 
 database:
   host: "127.0.0.1"
@@ -290,8 +319,10 @@ log:
   db_log_level: "warn"
   api_log_days: 30
 EOF
+  ok "新建 ${CONF_DIR}/config.yaml"
 else
-  info "保留已有 ${CONF_DIR}/config.yaml"
+  # 确保密码与凭证一致（若用户手动改过 config 则不覆盖）
+  ok "保留已有 ${CONF_DIR}/config.yaml"
 fi
 
 cat > "$CONF_DIR/db.credentials" <<EOF
@@ -299,19 +330,19 @@ DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASS=${DB_PASS}
 EOF
-chmod 600 "$CONF_DIR/config.yaml" "$CONF_DIR/db.credentials" 2>/dev/null || true
+chmod 600 "$CONF_DIR/config.yaml" "$CONF_DIR/db.credentials"
 chown -R k2pay:k2pay "$CONF_DIR"
 
 if [[ -n "${DOMAIN:-}" ]]; then
-  if [[ "$SKIP_CERT" -eq 0 ]]; then
+  if [[ "$SKIP_HTTPS" -eq 0 ]]; then
     echo "SITE_URL=https://${DOMAIN}" > "$CONF_DIR/site.env"
   else
     echo "SITE_URL=http://${DOMAIN}" > "$CONF_DIR/site.env"
   fi
 fi
 
-# ---------- systemd ----------
-info "配置 systemd..."
+# ---- 6. systemd ----
+step "配置 systemd 服务"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=K2Pay Payment Gateway
@@ -325,123 +356,56 @@ Group=k2pay
 WorkingDirectory=${CONF_DIR}
 ExecStart=${BIN_PATH}
 Restart=on-failure
-RestartSec=5
+RestartSec=3
 LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable k2pay
-systemctl restart k2pay || true
+systemctl enable k2pay >/dev/null 2>&1
+systemctl restart k2pay
 sleep 2
-if systemctl is-active --quiet k2pay; then info "k2pay 服务已启动"; else
-  warn "服务可能未就绪: journalctl -u k2pay -n 40 --no-pager"
+if systemctl is-active --quiet k2pay; then
+  ok "k2pay 服务运行中"
+else
+  warn "服务启动失败，查看: journalctl -u k2pay -n 30 --no-pager"
+  journalctl -u k2pay -n 15 --no-pager 2>/dev/null || true
 fi
 
-# ---------- Nginx 工具函数 ----------
-nginx_backup_dir="/root/k2pay-nginx-backup-$(date +%Y%m%d%H%M%S)"
+# ---- 7. Nginx + HTTPS ----
+HAS_HTTPS=0
+if [[ "$NO_NGINX" -eq 0 && -n "${DOMAIN:-}" ]]; then
+  step "配置 Nginx (${DOMAIN})"
 
-detect_nginx_layout() {
   if [[ -d /etc/nginx/sites-available ]]; then
-    NGINX_LAYOUT="debian"
     NGINX_CONF="/etc/nginx/sites-available/k2pay"
-    NGINX_ENABLED="/etc/nginx/sites-enabled/k2pay"
+    mkdir -p /etc/nginx/sites-enabled
   else
-    NGINX_LAYOUT="rhel"
     NGINX_CONF="/etc/nginx/conf.d/k2pay.conf"
-    NGINX_ENABLED=""
-  fi
-}
-
-# 清理会与本域名冲突的站点（保留证书目录 /etc/letsencrypt）
-reset_nginx_sites() {
-  local domain="$1"
-  info "清理冲突的 Nginx 站点配置（保留 Let's Encrypt 证书）..."
-  mkdir -p "$nginx_backup_dir"
-
-  # 备份并移除 k2pay 旧配置
-  for f in \
-    /etc/nginx/sites-available/k2pay \
-    /etc/nginx/sites-enabled/k2pay \
-    /etc/nginx/sites-enabled/k2payy \
-    /etc/nginx/conf.d/k2pay.conf \
-    /etc/nginx/conf.d/k2pay.conf.bak
-  do
-    if [[ -e "$f" || -L "$f" ]]; then
-      cp -a "$f" "$nginx_backup_dir/" 2>/dev/null || true
-      rm -f "$f"
-    fi
-  done
-
-  # 禁用 default（Certbot 常把证书错装到 default 导致 301 死循环）
-  for f in /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default.conf; do
-    if [[ -e "$f" || -L "$f" ]]; then
-      cp -a "$f" "$nginx_backup_dir/" 2>/dev/null || true
-      rm -f "$f"
-      info "已禁用: $f （备份在 $nginx_backup_dir）"
-    fi
-  done
-  # sites-available/default 保留文件但取消启用即可
-  if [[ -f /etc/nginx/sites-available/default ]]; then
-    cp -a /etc/nginx/sites-available/default "$nginx_backup_dir/" 2>/dev/null || true
   fi
 
-  # 删除 conf.d 里包含本域名的其它自定义文件（不碰 nginx.conf）
-  if [[ -d /etc/nginx/conf.d ]]; then
-    local f
-    for f in /etc/nginx/conf.d/*.conf; do
-      [[ -f "$f" ]] || continue
-      if grep -q "server_name.*${domain}" "$f" 2>/dev/null; then
-        info "移除含本域名的配置: $f"
-        cp -a "$f" "$nginx_backup_dir/" 2>/dev/null || true
-        rm -f "$f"
-      fi
-    done
-  fi
+  # 清理旧 k2pay / default 冲突
+  rm -f /etc/nginx/sites-enabled/k2pay /etc/nginx/sites-enabled/k2payy \
+        /etc/nginx/sites-available/k2pay /etc/nginx/conf.d/k2pay.conf
+  rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default.conf 2>/dev/null || true
+  mkdir -p "$WEBROOT"
 
-  # sites-enabled 里其它含本域名的配置
-  if [[ -d /etc/nginx/sites-enabled ]]; then
-    local f
-    for f in /etc/nginx/sites-enabled/*; do
-      [[ -e "$f" || -L "$f" ]] || continue
-      local real="$f"
-      [[ -L "$f" ]] && real="$(readlink -f "$f" 2>/dev/null || echo "$f")"
-      if grep -q "server_name.*${domain}" "$real" 2>/dev/null || grep -q "server_name.*${domain}" "$f" 2>/dev/null; then
-        info "移除含本域名的站点: $f"
-        cp -a "$f" "$nginx_backup_dir/" 2>/dev/null || true
-        rm -f "$f"
-      fi
-    done
-  fi
-}
-
-cert_exists() {
-  local domain="$1"
-  [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" && -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]]
-}
-
-# 写入 HTTP-only（用于申请证书或 --skip-cert）
-write_nginx_http_only() {
-  local domain="$1"
-  local conf="$2"
-  cat > "$conf" <<EOF
-# K2Pay — managed by install.sh (HTTP)
+  write_http() {
+    cat > "$NGINX_CONF" <<EOF
+# K2Pay (HTTP)
 server {
     listen 80;
     listen [::]:80;
-    server_name ${domain};
-
+    server_name ${DOMAIN};
     client_max_body_size 50m;
-
     location ^~ /.well-known/acme-challenge/ {
         root ${WEBROOT};
-        default_type "text/plain";
+        default_type text/plain;
         allow all;
     }
-
     location / {
-        proxy_pass http://127.0.0.1:${HTTP_PORT};
+        proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -451,52 +415,36 @@ server {
     }
 }
 EOF
-}
+  }
 
-# 写入完整 HTTP→HTTPS + 反代（证书已存在时使用）
-write_nginx_https() {
-  local domain="$1"
-  local conf="$2"
-  local ssl_opts=""
-  local ssl_dh=""
-  [[ -f /etc/letsencrypt/options-ssl-nginx.conf ]] && ssl_opts="include /etc/letsencrypt/options-ssl-nginx.conf;"
-  [[ -f /etc/letsencrypt/ssl-dhparams.pem ]] && ssl_dh="ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;"
-
-  cat > "$conf" <<EOF
-# K2Pay — managed by install.sh (HTTPS)
-# 证书: /etc/letsencrypt/live/${domain}/
-# 反代: 127.0.0.1:${HTTP_PORT}
-
+  write_https() {
+    local ssl_opts="" ssl_dh=""
+    [[ -f /etc/letsencrypt/options-ssl-nginx.conf ]] && ssl_opts="include /etc/letsencrypt/options-ssl-nginx.conf;"
+    [[ -f /etc/letsencrypt/ssl-dhparams.pem ]] && ssl_dh="ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;"
+    cat > "$NGINX_CONF" <<EOF
+# K2Pay (HTTPS)
 server {
     listen 80;
     listen [::]:80;
-    server_name ${domain};
-
+    server_name ${DOMAIN};
     location ^~ /.well-known/acme-challenge/ {
         root ${WEBROOT};
-        default_type "text/plain";
+        default_type text/plain;
         allow all;
     }
-
-    location / {
-        return 301 https://\$host\$request_uri;
-    }
+    location / { return 301 https://\$host\$request_uri; }
 }
-
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name ${domain};
-
-    ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    server_name ${DOMAIN};
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
     ${ssl_opts}
     ${ssl_dh}
-
     client_max_body_size 50m;
-
     location / {
-        proxy_pass http://127.0.0.1:${HTTP_PORT};
+        proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -506,101 +454,63 @@ server {
     }
 }
 EOF
-}
+  }
 
-enable_nginx_conf() {
-  local conf="$1"
-  if [[ "$NGINX_LAYOUT" == "debian" ]]; then
-    mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available
-    ln -sfn "$conf" /etc/nginx/sites-enabled/k2pay
+  write_http
+  if [[ -d /etc/nginx/sites-enabled ]]; then
+    ln -sfn "$NGINX_CONF" /etc/nginx/sites-enabled/k2pay
   fi
-}
+  nginx -t >/dev/null 2>&1 || die "Nginx 配置检测失败"
+  quiet systemctl reload nginx || quiet systemctl restart nginx
+  ok "HTTP 反代就绪"
 
-# ---------- Nginx + 证书 ----------
-HAS_HTTPS=0
-if [[ "$SKIP_NGINX" -eq 0 && -n "${DOMAIN:-}" ]]; then
-  detect_nginx_layout
-  mkdir -p "$WEBROOT"
-
-  if [[ "$RESET_NGINX" -eq 1 ]]; then
-    reset_nginx_sites "$DOMAIN"
-  else
-    rm -f /etc/nginx/sites-enabled/k2pay /etc/nginx/sites-available/k2pay /etc/nginx/conf.d/k2pay.conf
-  fi
-
-  # 先写 HTTP，保证 ACME 与 nginx -t 能过
-  write_nginx_http_only "$DOMAIN" "$NGINX_CONF"
-  enable_nginx_conf "$NGINX_CONF"
-  nginx -t || die "Nginx 配置检测失败"
-  systemctl reload nginx || systemctl restart nginx
-
-  if [[ "$SKIP_CERT" -eq 0 ]]; then
-    if cert_exists "$DOMAIN"; then
-      info "检测到已有证书 /etc/letsencrypt/live/${DOMAIN}/ ，直接写入 HTTPS 反代配置"
-      write_nginx_https "$DOMAIN" "$NGINX_CONF"
-      enable_nginx_conf "$NGINX_CONF"
-      nginx -t && systemctl reload nginx
+  if [[ "$SKIP_HTTPS" -eq 0 ]]; then
+    if [[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]]; then
+      write_https
+      nginx -t >/dev/null 2>&1 && quiet systemctl reload nginx
       HAS_HTTPS=1
-    else
-      if [[ -z "${EMAIL:-}" ]]; then
-        warn "无证书且未提供 --email，保持 HTTP。稍后可加邮箱重装申请证书。"
-      elif ! command -v certbot >/dev/null 2>&1; then
-        warn "未安装 certbot，保持 HTTP"
+      ok "已挂载已有证书"
+    elif command -v certbot >/dev/null 2>&1; then
+      echo "  正在申请证书（邮箱: ${EMAIL}）…"
+      if certbot certonly --webroot \
+          -w "$WEBROOT" -d "$DOMAIN" \
+          --non-interactive --agree-tos -m "$EMAIL" \
+          --preferred-challenges http >/dev/null 2>&1; then
+        write_https
+        nginx -t >/dev/null 2>&1 && quiet systemctl reload nginx
+        HAS_HTTPS=1
+        ok "HTTPS 证书已签发"
       else
-        info "申请 Let's Encrypt 证书 (certonly --webroot，不改写其它站点)..."
-        if certbot certonly --webroot \
-            -w "$WEBROOT" \
-            -d "$DOMAIN" \
-            --non-interactive --agree-tos \
-            -m "$EMAIL" \
-            --preferred-challenges http; then
-          write_nginx_https "$DOMAIN" "$NGINX_CONF"
-          enable_nginx_conf "$NGINX_CONF"
-          nginx -t && systemctl reload nginx
-          HAS_HTTPS=1
-          info "证书申请成功并已写入 Nginx"
-        else
-          warn "证书申请失败，保持 HTTP 反代。检查 80 端口与域名解析后重跑安装脚本。"
-        fi
+        warn "证书申请失败（检查域名解析与 80 端口后重新运行本脚本）"
       fi
+    else
+      warn "未安装 certbot，保持 HTTP"
     fi
-  else
-    info "已 --skip-cert，仅 HTTP 反代"
-  fi
-
-  # 最终校验
-  if nginx -t 2>/dev/null; then
-    systemctl reload nginx 2>/dev/null || true
-    info "Nginx 配置完成: $NGINX_CONF"
-  else
-    die "Nginx 最终检测失败，备份在: $nginx_backup_dir"
   fi
 fi
 
-# ---------- 完成 ----------
+# ---- 完成 ----
 echo
-info "========== 安装完成 =========="
-echo "  二进制:   ${BIN_PATH}"
-echo "  配置:     ${CONF_DIR}/config.yaml"
-echo "  数据:     ${DATA_DIR}"
-echo "  数据库:   ${DB_NAME} / ${DB_USER}  (密码见 ${CONF_DIR}/db.credentials)"
-echo "  服务:     systemctl status k2pay"
-if [[ -n "${DOMAIN:-}" && "$SKIP_NGINX" -eq 0 ]]; then
+echo -e "${C2}╔══════════════════════════════════════╗"
+echo -e "║           安装完成                   ║"
+echo -e "╚══════════════════════════════════════╝${C0}"
+echo
+echo "  服务状态:  systemctl status k2pay"
+echo "  配置文件:  ${CONF_DIR}/config.yaml"
+echo "  数据库:    PostgreSQL ${DB_NAME}（密码见 ${CONF_DIR}/db.credentials）"
+if [[ -n "${DOMAIN:-}" && "$NO_NGINX" -eq 0 ]]; then
   if [[ "$HAS_HTTPS" -eq 1 ]]; then
-    echo "  HTTPS:    已启用 (证书 /etc/letsencrypt/live/${DOMAIN}/)"
-    echo "  管理后台: https://${DOMAIN}/admin"
-    echo "  商户后台: https://${DOMAIN}/merchant"
-    echo "  支付 API: https://${DOMAIN}/api/pay/"
+    echo "  管理后台:  https://${DOMAIN}/admin"
+    echo "  商户后台:  https://${DOMAIN}/merchant"
   else
-    echo "  HTTP:     http://${DOMAIN}/admin"
-    echo "  提示:     证书未就绪时可用: sudo bash install.sh --domain ${DOMAIN} --email you@xx.com --reinstall"
-  fi
-  if [[ -d "$nginx_backup_dir" ]]; then
-    echo "  Nginx备份: ${nginx_backup_dir}"
+    echo "  管理后台:  http://${DOMAIN}/admin"
+    echo "  商户后台:  http://${DOMAIN}/merchant"
   fi
 else
-  echo "  本机:     http://127.0.0.1:${HTTP_PORT}/admin"
+  echo "  管理后台:  http://127.0.0.1:${APP_PORT}/admin"
+  echo "  商户后台:  http://127.0.0.1:${APP_PORT}/merchant"
 fi
-echo "  默认账号: admin / admin123  (请立即修改)"
-echo "  卸载:     curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh | sudo bash"
-echo "================================"
+echo "  默认账号:  admin / admin123  ← 请立即修改"
+echo
+echo "  卸载: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh | sudo bash"
+echo

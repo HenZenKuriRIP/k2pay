@@ -17,7 +17,7 @@ type ExchangeRateHistory struct {
 	ChangePercent decimal.Decimal `gorm:"type:decimal(8,4)" json:"change_percent"`        // 变化百分比
 	UpdateSource  string          `gorm:"type:varchar(50)" json:"update_source"`          // 更新来源
 	UpdatedBy     string          `gorm:"type:varchar(50)" json:"updated_by"`             // 更新者
-	CreatedAt     time.Time       `gorm:"type:datetime(3)" json:"created_at"`
+	CreatedAt     time.Time       `json:"created_at"`
 }
 
 // TableName 指定表名
