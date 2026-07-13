@@ -116,14 +116,30 @@ func ToEpayType(internalTypeOrChain string) string {
 	return meta.EpayType
 }
 
-// IsValidChain 检查链是否有效
+// IsValidChain 检查链是否有效（内置链 + 可选动态校验回调）
+// 动态添加的链通过 SetDynamicChainValidator 注册校验
 func IsValidChain(chain string) bool {
 	validChains := map[string]bool{
 		"trx": true, "trc20": true, "erc20": true, "bep20": true,
 		"polygon": true, "optimism": true, "arbitrum": true,
 		"avalanche": true, "base": true, "wechat": true, "alipay": true,
 	}
-	return validChains[chain]
+	if validChains[chain] {
+		return true
+	}
+	// 动态链校验（由 blockchain 服务在启动时注册）
+	if dynamicChainValidator != nil {
+		return dynamicChainValidator(chain)
+	}
+	return false
+}
+
+// dynamicChainValidator 动态链校验函数（避免 util 包循环依赖 service）
+var dynamicChainValidator func(chain string) bool
+
+// SetDynamicChainValidator 设置动态链校验器
+func SetDynamicChainValidator(fn func(chain string) bool) {
+	dynamicChainValidator = fn
 }
 
 // IsFiatChain 检查是否为法币收款方式

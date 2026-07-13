@@ -124,18 +124,31 @@ func autoMigrate() error {
 		&ExchangeRate{},
 		&ExchangeRateHistory{},
 		&BlockScanProgress{},
+		&ChainConfig{},
 	)
 }
 
 // initDefaultData 初始化默认数据
 func initDefaultData() error {
 	// 初始化系统商户(id=0)
-	// 用于全局钱包,这样wallets表的外键约束能正常工作
+	// 仅用于 wallets 表外键约束，不参与商户管理/登录/统计
+	// 清理历史脏数据：p_id=SYSTEM 但 id!=0 的重复记录（常见于 AUTO_INCREMENT 把 0 变成了自增值）
+	var dupSystemIDs []uint
+	DB.Model(&Merchant{}).Where("p_id = ? AND id != 0", "SYSTEM").Pluck("id", &dupSystemIDs)
+	if len(dupSystemIDs) > 0 {
+		// 先把误挂到重复系统商户上的钱包归并到 id=0
+		if err := DB.Model(&Wallet{}).Where("merchant_id IN ?", dupSystemIDs).Update("merchant_id", 0).Error; err != nil {
+			log.Printf("Warning: reassign wallets from duplicate SYSTEM merchants: %v", err)
+		}
+		if res := DB.Where("p_id = ? AND id != 0", "SYSTEM").Delete(&Merchant{}); res.Error != nil {
+			log.Printf("Warning: Failed to clean duplicate SYSTEM merchants: %v", res.Error)
+		} else if res.RowsAffected > 0 {
+			log.Printf("Cleaned %d duplicate SYSTEM merchant row(s)", res.RowsAffected)
+		}
+	}
+
 	var systemMerchant Merchant
 	if err := DB.Where("id = ?", 0).First(&systemMerchant).Error; err != nil {
-		// 先删除任何p_id为SYSTEM的旧记录(可能id不是0)
-		DB.Exec("DELETE FROM merchants WHERE p_id = 'SYSTEM' AND id != 0")
-
 		// 使用 NO_AUTO_VALUE_ON_ZERO 模式允许插入 id=0
 		// 这是MySQL官方推荐的方式来插入0到AUTO_INCREMENT列
 		DB.Exec("SET SESSION sql_mode = 'NO_AUTO_VALUE_ON_ZERO'")
@@ -143,7 +156,7 @@ func initDefaultData() error {
 		defer DB.Exec("SET SESSION sql_mode = ''")
 		result := DB.Exec(`INSERT INTO merchants (id, p_id, name, ` + "`key`" + `, password, status, created_at, updated_at)
 			VALUES (0, 'SYSTEM', '系统钱包', 'system_key', '', 1, NOW(), NOW())
-			ON DUPLICATE KEY UPDATE p_id = 'SYSTEM'`)
+			ON DUPLICATE KEY UPDATE p_id = 'SYSTEM', name = '系统钱包'`)
 		if result.Error != nil {
 			log.Printf("Warning: Failed to create system merchant: %v", result.Error)
 		} else if result.RowsAffected > 0 {
@@ -174,9 +187,9 @@ func initDefaultData() error {
 			Update("must_change_password", true)
 	}
 
-	// 初始化默认商户
+	// 初始化默认商户（排除系统内部商户 id=0）
 	var merchantCount int64
-	DB.Model(&Merchant{}).Count(&merchantCount)
+	DB.Model(&Merchant{}).Where("id > 0 AND p_id != ?", "SYSTEM").Count(&merchantCount)
 	// 默认商户密码: merchant123
 	defaultMerchantPassword := "$2a$10$ZfUDWHWqrRcGn1mFlMklLudfG4rUnmoIwqaGFMm9ZBSg9CYbLRbvC"
 	if merchantCount == 0 {

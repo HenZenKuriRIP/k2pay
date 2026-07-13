@@ -415,12 +415,17 @@ func (s *OrderService) createOfficialPayment(order *model.Order) error {
 		}
 	}
 
+	subject := strings.TrimSpace(order.Name)
+	if subject == "" {
+		subject = "订单" + order.TradeNo
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 	result, err := drv.Create(ctx, &payment.CreateRequest{
 		TradeNo:    order.TradeNo,
 		OutTradeNo: order.OutTradeNo,
-		Subject:    order.Name,
+		Subject:    subject,
 		AmountCNY:  amountCNY,
 		ClientIP:   order.ClientIP,
 		NotifyURL:  notifyURL,

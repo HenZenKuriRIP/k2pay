@@ -12,33 +12,92 @@
     <script src="/static/js/i18n.js?v=4"></script>
     <link href="/static/css/remixicon.css" rel="stylesheet">
     <style>
+        :root {
+            --m-bg: #f4f7fb;
+            --m-surface: #ffffff;
+            --m-border: #e8eef5;
+            --m-text: #0f172a;
+            --m-muted: #64748b;
+            --m-primary: #2563eb;
+            --m-sidebar: #0b1220;
+            --m-radius: 12px;
+            --m-shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.03);
+        }
         [v-cloak] { display: none; }
         .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
         .fade-enter-from, .fade-leave-to { opacity: 0; }
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--m-bg); color: var(--m-text);
+            -webkit-font-smoothing: antialiased;
+        }
+        .m-card {
+            background: var(--m-surface); border: 1px solid var(--m-border);
+            border-radius: var(--m-radius); box-shadow: var(--m-shadow);
+        }
+        .m-input {
+            width: 100%; max-width: 100%; padding: 10px 12px;
+            border: 1px solid #d5dee9; border-radius: 8px; font-size: 14px;
+            background: #fff; transition: border-color .15s, box-shadow .15s;
+        }
+        .m-input:focus {
+            outline: none; border-color: var(--m-primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+        }
+        .m-label { display: block; font-size: 13px; font-weight: 550; color: #475569; margin-bottom: 6px; }
+        .m-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 9px 16px; border-radius: 8px; font-size: 13.5px; font-weight: 550;
+            border: 1px solid transparent; cursor: pointer; transition: all .15s;
+        }
+        .m-btn-primary { background: var(--m-primary); color: #fff; }
+        .m-btn-primary:hover { background: #1d4ed8; }
+        .m-btn-ghost { background: transparent; border-color: #d5dee9; color: #475569; }
+        .m-btn-ghost:hover { background: #f8fafc; }
+        .m-nav-item {
+            display: flex; align-items: center; padding: 10px 12px; margin: 0 10px 2px;
+            border-radius: 10px; cursor: pointer; color: #94a3b8; font-size: 13.5px; font-weight: 500;
+            transition: all .15s;
+        }
+        .m-nav-item:hover { background: rgba(255,255,255,.05); color: #e2e8f0; }
+        .m-nav-item.active { background: rgba(37,99,235,.18); color: #fff; box-shadow: inset 0 0 0 1px rgba(37,99,235,.25); }
+        .m-page-title { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 20px; }
+        .m-stat-value { font-size: 26px; font-weight: 700; letter-spacing: -.03em; }
+        .m-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 720px; }
+        @media (max-width: 768px) { .m-form-grid { grid-template-columns: 1fr; } }
+        .m-form-narrow { max-width: 480px; }
+        .m-table th { background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 600; }
+        .m-table td { font-size: 13.5px; }
+        .m-login-wrap {
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(160deg, #eef4ff 0%, #f4f7fb 45%, #e8f7f2 100%);
+            padding: 24px;
+        }
+        .m-login-card {
+            background: #fff; border: 1px solid var(--m-border); border-radius: 20px;
+            box-shadow: var(--m-shadow); width: 400px; max-width: 100%; padding: 36px 32px;
+        }
     </style>
 </head>
-<body class="bg-gray-100">
+<body>
     <div id="app" v-cloak>
         <!-- 登录页面 -->
-        <div v-if="!isLoggedIn" class="min-h-screen flex items-center justify-center">
-            <div class="bg-white p-8 rounded-lg shadow-lg w-96">
+        <div v-if="!isLoggedIn" class="m-login-wrap">
+            <div class="m-login-card">
                 <div class="flex justify-end mb-4"><div id="loginLangSelector"></div></div>
-                <h1 class="text-2xl font-bold text-center mb-6" data-i18n="merchant.title">商户中心</h1>
+                <h1 class="text-xl font-bold text-center mb-6 tracking-tight" data-i18n="merchant.title">商户中心</h1>
                 <form @submit.prevent="login">
                     <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchant.pid">商户PID</label>
-                        <input v-model="loginForm.pid" type="text"
-                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <label class="m-label" data-i18n="merchant.pid">商户PID</label>
+                        <input v-model="loginForm.pid" type="text" class="m-input"
                             data-i18n-placeholder="merchantPage.login.pidPlaceholder" placeholder="请输入商户PID" required>
                     </div>
                     <div class="mb-6">
-                        <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="auth.password">密码</label>
-                        <input v-model="loginForm.password" type="password"
-                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <label class="m-label" data-i18n="auth.password">密码</label>
+                        <input v-model="loginForm.password" type="password" class="m-input"
                             data-i18n-placeholder="merchantPage.login.passwordPlaceholder" placeholder="请输入密码" required>
                     </div>
-                    <button type="submit" :disabled="loading"
-                        class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 disabled:opacity-50">
+                    <button type="submit" :disabled="loading" class="m-btn m-btn-primary w-full py-3 disabled:opacity-50">
                         <span v-if="loading" data-i18n="common.loading">登录中...</span>
                         <span v-else data-i18n="auth.login">登录</span>
                     </button>
@@ -48,30 +107,25 @@
         </div>
 
         <!-- 强制修改弱口令 -->
-        <div v-else-if="mustChangePassword" class="min-h-screen flex items-center justify-center">
-            <div class="bg-white p-8 rounded-lg shadow-lg w-96">
-                <h1 class="text-xl font-bold text-center mb-2 text-red-600">需要修改密码</h1>
-                <p class="text-sm text-gray-600 mb-6 text-center leading-relaxed">
+        <div v-else-if="mustChangePassword" class="m-login-wrap">
+            <div class="m-login-card">
+                <h1 class="text-lg font-bold text-center mb-2 text-red-600">需要修改密码</h1>
+                <p class="text-sm text-slate-500 mb-6 text-center leading-relaxed">
                     当前账号仍使用默认或弱密码，必须先修改为强密码（至少 8 位）后才能继续使用。
                 </p>
                 <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">当前密码</label>
-                    <input v-model="forcePasswordForm.old_password" type="password"
-                        class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <label class="m-label">当前密码</label>
+                    <input v-model="forcePasswordForm.old_password" type="password" class="m-input" required>
                 </div>
                 <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">新密码</label>
-                    <input v-model="forcePasswordForm.new_password" type="password" minlength="8"
-                        class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="至少8位" required>
+                    <label class="m-label">新密码</label>
+                    <input v-model="forcePasswordForm.new_password" type="password" minlength="8" class="m-input" placeholder="至少8位" required>
                 </div>
                 <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">确认新密码</label>
-                    <input v-model="forcePasswordForm.confirm_password" type="password" minlength="8"
-                        class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <label class="m-label">确认新密码</label>
+                    <input v-model="forcePasswordForm.confirm_password" type="password" minlength="8" class="m-input" required>
                 </div>
-                <button @click="submitForcePassword" :disabled="loading"
-                    class="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 disabled:opacity-50">
+                <button @click="submitForcePassword" :disabled="loading" class="m-btn w-full py-3 text-white disabled:opacity-50" style="background:#dc2626;">
                     确认修改
                 </button>
                 <p v-if="loginError" class="mt-4 text-red-500 text-center text-sm">[[ loginError ]]</p>
@@ -81,82 +135,75 @@
         <!-- 主界面 -->
         <div v-else class="min-h-screen">
             <!-- 侧边栏 - 固定定位 -->
-            <div class="fixed left-0 top-0 w-64 h-screen bg-gray-800 text-white flex flex-col">
-                <div class="p-4 border-b border-gray-700">
-                    <h1 class="text-xl font-bold" data-i18n="merchant.title">K2Pay 商户中心</h1>
-                    <p class="text-gray-400 text-sm mt-1">[[ merchant.name || merchant.pid ]]</p>
+            <div class="fixed left-0 top-0 w-60 h-screen flex flex-col" style="background:var(--m-sidebar);color:#e2e8f0;border-right:1px solid rgba(255,255,255,.04);">
+                <div class="px-5 py-5 border-b" style="border-color:rgba(255,255,255,.06);">
+                    <h1 class="text-base font-bold tracking-tight" style="background:linear-gradient(90deg,#93c5fd,#6ee7b7);-webkit-background-clip:text;background-clip:text;color:transparent;" data-i18n="merchant.title">K2Pay 商户中心</h1>
+                    <p class="text-slate-400 text-xs mt-1.5">[[ merchant.name || merchant.pid ]]</p>
                 </div>
-                <nav class="mt-4 flex-1 overflow-y-auto">
-                    <a @click="currentTab = 'dashboard'" :class="{'bg-gray-700': currentTab === 'dashboard'}"
-                        class="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-700">
+                <nav class="mt-3 flex-1 overflow-y-auto pb-4">
+                    <a @click="currentTab = 'dashboard'" :class="{'active': currentTab === 'dashboard'}" class="m-nav-item">
                         <i class="ri-dashboard-line mr-3"></i> <span data-i18n="admin.dashboard">仪表盘</span>
                     </a>
-                    <a @click="currentTab = 'chains'" :class="{'bg-gray-700': currentTab === 'chains'}"
-                        class="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-700">
+                    <a @click="currentTab = 'chains'" :class="{'active': currentTab === 'chains'}" class="m-nav-item">
                         <i class="ri-link mr-3"></i> <span data-i18n="admin.chains">链路状态</span>
                     </a>
-                    <a @click="currentTab = 'apikey'" :class="{'bg-gray-700': currentTab === 'apikey'}"
-                        class="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-700">
+                    <a @click="currentTab = 'apikey'" :class="{'active': currentTab === 'apikey'}" class="m-nav-item">
                         <i class="ri-key-2-line mr-3"></i> <span data-i18n="merchant.apiKey">API密钥</span>
                     </a>
-                    <a @click="currentTab = 'wallets'" :class="{'bg-gray-700': currentTab === 'wallets'}"
-                        class="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-700">
+                    <a @click="currentTab = 'wallets'" :class="{'active': currentTab === 'wallets'}" class="m-nav-item">
                         <i class="ri-wallet-3-line mr-3"></i> <span data-i18n="merchant.myWallets">钱包管理</span>
                     </a>
-                    <a @click="currentTab = 'orders'" :class="{'bg-gray-700': currentTab === 'orders'}"
-                        class="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-700">
+                    <a @click="currentTab = 'orders'" :class="{'active': currentTab === 'orders'}" class="m-nav-item">
                         <i class="ri-file-list-3-line mr-3"></i> <span data-i18n="merchant.myOrders">订单管理</span>
                     </a>
-                    <a @click="currentTab = 'withdraw'" :class="{'bg-gray-700': currentTab === 'withdraw'}"
-                        class="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-700">
+                    <a @click="currentTab = 'withdraw'" :class="{'active': currentTab === 'withdraw'}" class="m-nav-item">
                         <i class="ri-money-cny-circle-line mr-3"></i> <span data-i18n="merchant.withdrawal">提现管理</span>
                     </a>
-                    <a @click="currentTab = 'settings'" :class="{'bg-gray-700': currentTab === 'settings'}"
-                        class="flex items-center px-4 py-3 cursor-pointer hover:bg-gray-700">
+                    <a @click="currentTab = 'settings'" :class="{'active': currentTab === 'settings'}" class="m-nav-item">
                         <i class="ri-settings-3-line mr-3"></i> <span data-i18n="admin.settings">商户设置</span>
                     </a>
                 </nav>
             </div>
 
             <!-- 主内容区 - 左边留出侧边栏宽度 -->
-            <div class="ml-64 min-h-screen overflow-auto">
+            <div class="ml-60 min-h-screen overflow-auto">
                 <!-- 顶部栏 -->
-                <div class="bg-white shadow px-6 py-3 flex justify-end items-center gap-4 sticky top-0 z-10">
+                <div class="px-6 py-3 flex justify-end items-center gap-4 sticky top-0 z-10" style="background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--m-border);">
                     <div id="mainLangSelector"></div>
-                    <button @click="logout" class="flex items-center text-gray-600 hover:text-gray-900">
-                        <i class="ri-logout-box-line mr-1"></i> <span data-i18n="auth.logout">退出登录</span>
+                    <button @click="logout" class="m-btn m-btn-ghost text-sm py-1.5">
+                        <i class="ri-logout-box-line"></i> <span data-i18n="auth.logout">退出登录</span>
                     </button>
                 </div>
                 <!-- 仪表盘 -->
-                <div v-if="currentTab === 'dashboard'" class="p-6">
-                    <h2 class="text-2xl font-bold mb-6" data-i18n="admin.dashboard">仪表盘</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="text-gray-500 text-sm" data-i18n="dashboard.todayOrders">今日订单</div>
-                            <div class="text-3xl font-bold text-blue-600">[[ dashboard.today?.orders || 0 ]]</div>
+                <div v-if="currentTab === 'dashboard'" class="p-6 md:p-8">
+                    <h2 class="m-page-title" data-i18n="admin.dashboard">仪表盘</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="m-card p-5">
+                            <div class="text-slate-500 text-sm" data-i18n="dashboard.todayOrders">今日订单</div>
+                            <div class="m-stat-value text-blue-600 mt-1">[[ dashboard.today?.orders || 0 ]]</div>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="text-gray-500 text-sm" data-i18n="merchantPage.dashboard.todayAmount">今日金额</div>
-                            <div class="text-3xl font-bold text-green-600">$[[ (dashboard.today?.amount || 0).toFixed(2) ]]</div>
+                        <div class="m-card p-5">
+                            <div class="text-slate-500 text-sm" data-i18n="merchantPage.dashboard.todayAmount">今日金额</div>
+                            <div class="m-stat-value text-emerald-600 mt-1">$[[ (dashboard.today?.amount || 0).toFixed(2) ]]</div>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="text-gray-500 text-sm" data-i18n="merchantPage.dashboard.totalOrders">累计订单</div>
-                            <div class="text-3xl font-bold text-purple-600">[[ dashboard.total?.orders || 0 ]]</div>
+                        <div class="m-card p-5">
+                            <div class="text-slate-500 text-sm" data-i18n="merchantPage.dashboard.totalOrders">累计订单</div>
+                            <div class="m-stat-value text-violet-600 mt-1">[[ dashboard.total?.orders || 0 ]]</div>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="text-gray-500 text-sm" data-i18n="merchantPage.dashboard.totalAmount">累计金额</div>
-                            <div class="text-3xl font-bold text-orange-600">$[[ (dashboard.total?.amount || 0).toFixed(2) ]]</div>
+                        <div class="m-card p-5">
+                            <div class="text-slate-500 text-sm" data-i18n="merchantPage.dashboard.totalAmount">累计金额</div>
+                            <div class="m-stat-value text-amber-600 mt-1">$[[ (dashboard.total?.amount || 0).toFixed(2) ]]</div>
                         </div>
                     </div>
 
                     <!-- 趋势图 -->
-                    <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="m-card p-6">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold" data-i18n="dashboard.dataTrend">数据趋势</h3>
+                            <h3 class="text-base font-semibold" data-i18n="dashboard.dataTrend">数据趋势</h3>
                             <div class="flex gap-2">
                                 <button v-for="p in trendPeriods" :key="p.value"
                                     @click="trendPeriod = p.value; loadTrendData()"
-                                    :class="trendPeriod === p.value ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                                    :class="trendPeriod === p.value ? 'm-btn-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
                                     class="px-3 py-1 rounded-lg text-sm transition-colors">
                                     [[ p.label ]]
                                 </button>
@@ -182,32 +229,32 @@
                 </div>
 
                 <!-- 订单管理 -->
-                <div v-if="currentTab === 'orders'" class="p-6">
+                <div v-if="currentTab === 'orders'" class="p-6 md:p-8">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold" data-i18n="merchant.myOrders">订单管理</h2>
-                        <button @click="showTestPaymentModal = true" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                        <button @click="showTestPaymentModal = true" class="m-btn m-btn-primary">
                             <i class="ri-add-line mr-1"></i><span data-i18n="adminPage.orders.testPayment">发起测试支付</span>
                         </button>
                     </div>
-                    <div class="bg-white p-4 rounded-lg shadow mb-6">
+                    <div class="m-card p-4 mb-6">
                         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <input v-model="orderFilter.trade_no" data-i18n-placeholder="order.tradeNo" placeholder="交易号"
-                                class="px-3 py-2 border rounded-lg">
+                                class="m-input">
                             <input v-model="orderFilter.out_trade_no" data-i18n-placeholder="order.outTradeNo" placeholder="商户订单号"
-                                class="px-3 py-2 border rounded-lg">
-                            <select v-model="orderFilter.status" class="px-3 py-2 border rounded-lg">
+                                class="m-input">
+                            <select v-model="orderFilter.status" class="m-input">
                                 <option value="" data-i18n="adminPage.orders.filter.allStatus">全部状态</option>
                                 <option value="0" data-i18n="order.statusPending">待支付</option>
                                 <option value="1" data-i18n="order.statusPaid">已支付</option>
                                 <option value="2" data-i18n="order.statusExpired">已过期</option>
                             </select>
-                            <input v-model="orderFilter.start_date" type="date" class="px-3 py-2 border rounded-lg">
-                            <button @click="loadOrders" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" data-i18n="common.search">
+                            <input v-model="orderFilter.start_date" type="date" class="m-input">
+                            <button @click="loadOrders" class="m-btn m-btn-primary" data-i18n="common.search">
                                 搜索
                             </button>
                         </div>
                     </div>
-                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="m-card overflow-hidden">
                         <table class="min-w-full">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -278,11 +325,11 @@
                 </div>
 
                 <!-- 钱包管理 -->
-                <div v-if="currentTab === 'wallets'" class="p-6">
+                <div v-if="currentTab === 'wallets'" class="p-6 md:p-8">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-2xl font-bold" data-i18n="merchantPage.wallets.title">钱包管理</h2>
                         <button @click="showWalletModal = true; editWallet = {chain: 'trc20', status: 1}"
-                            class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                            class="m-btn m-btn-primary">
                             <i class="ri-add-line mr-2"></i><span data-i18n="wallet.addWallet">添加钱包</span>
                         </button>
                     </div>
@@ -302,7 +349,7 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div v-for="wallet in wallets" :key="wallet.id"
-                            class="bg-white rounded-lg shadow p-6">
+                            class="m-card p-6">
                             <div class="flex justify-between items-start mb-4">
                                 <div>
                                     <span class="px-2 py-1 rounded text-xs" :class="getChainClass(wallet.chain)">
@@ -330,12 +377,12 @@
                 </div>
 
                 <!-- 链路状态 -->
-                <div v-if="currentTab === 'chains'" class="p-6">
-                    <h2 class="text-2xl font-bold mb-6" data-i18n="merchantPage.chains.title">链路状态</h2>
+                <div v-if="currentTab === 'chains'" class="p-6 md:p-8">
+                    <h2 class="m-page-title" data-i18n="merchantPage.chains.title">链路状态</h2>
                     <p class="text-gray-500 mb-4" data-i18n="merchantPage.chains.desc">链路监控由管理员控制，您只能查看当前状态。禁用的链路将无法收款。</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div v-for="chain in chains" :key="chain.chain"
-                            class="bg-white rounded-lg shadow p-4 flex justify-between items-center">
+                            class="m-card p-4 flex justify-between items-center">
                             <div>
                                 <div class="font-medium">[[ chain.name ]]</div>
                                 <div class="text-gray-500 text-sm">[[ chain.chain ]]</div>
@@ -349,9 +396,9 @@
                 </div>
 
                 <!-- API密钥 -->
-                <div v-if="currentTab === 'apikey'" class="p-6">
-                    <h2 class="text-2xl font-bold mb-6" data-i18n="merchantPage.apikey.title">API密钥</h2>
-                    <div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+                <div v-if="currentTab === 'apikey'" class="p-6 md:p-8">
+                    <h2 class="m-page-title" data-i18n="merchantPage.apikey.title">API密钥</h2>
+                    <div class="m-card p-6 max-w-2xl">
                         <div class="mb-6">
                             <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.apikey.pid">商户PID</label>
                             <div class="flex gap-2">
@@ -382,20 +429,20 @@
                 </div>
 
                 <!-- 提现管理 -->
-                <div v-if="currentTab === 'withdraw'" class="p-6">
-                    <h2 class="text-2xl font-bold mb-6" data-i18n="merchantPage.withdraw.title">提现管理</h2>
+                <div v-if="currentTab === 'withdraw'" class="p-6 md:p-8">
+                    <h2 class="m-page-title" data-i18n="merchantPage.withdraw.title">提现管理</h2>
 
                     <!-- 余额卡片 -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                        <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="m-card p-6">
                             <div class="text-gray-500 text-sm" data-i18n="merchantPage.withdraw.balance">账户余额 (USDT)</div>
                             <div class="text-3xl font-bold text-blue-600">[[ balance.balance?.toFixed(2) || '0.00' ]]</div>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="m-card p-6">
                             <div class="text-gray-500 text-sm" data-i18n="merchantPage.withdraw.frozenBalance">冻结金额 (USDT)</div>
                             <div class="text-3xl font-bold text-orange-600">[[ balance.frozen_balance?.toFixed(2) || '0.00' ]]</div>
                         </div>
-                        <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="m-card p-6">
                             <div class="text-gray-500 text-sm" data-i18n="merchantPage.withdraw.availableBalance">可提现金额 (USDT)</div>
                             <div class="text-3xl font-bold text-green-600">[[ balance.available?.toFixed(2) || '0.00' ]]</div>
                         </div>
@@ -423,17 +470,17 @@
                     </div>
 
                     <!-- 申请提现 -->
-                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <div class="m-card p-6 mb-6">
                         <h3 class="text-lg font-semibold mb-4" data-i18n="merchantPage.withdraw.applyWithdraw">申请提现</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.withdraw.withdrawAmount">提现金额 (USDT)</label>
                                 <input v-model="withdrawForm.amount" type="number" step="1" min="50"
-                                    class="w-full px-3 py-2 border rounded-lg" data-i18n-placeholder="merchantPage.withdraw.minAmountHint" placeholder="最低50 USDT">
+                                    class="m-input" data-i18n-placeholder="merchantPage.withdraw.minAmountHint" placeholder="最低50 USDT">
                             </div>
                             <div>
                                 <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.withdraw.withdrawAddress">提现地址</label>
-                                <select v-model="withdrawForm.address_id" class="w-full px-3 py-2 border rounded-lg">
+                                <select v-model="withdrawForm.address_id" class="m-input">
                                     <option value="" data-i18n="merchantPage.withdraw.selectAddress">请选择提现地址</option>
                                     <option v-for="addr in approvedAddresses" :key="addr.id" :value="addr.id">
                                         [[ getAddressChainName(addr.chain) ]] - [[ addr.label || addr.address.substring(0, 20) + '...' ]]
@@ -454,7 +501,7 @@
                             <div class="md:col-span-2">
                                 <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.withdraw.remarkOptional">备注 (可选)</label>
                                 <input v-model="withdrawForm.remark" type="text"
-                                    class="w-full px-3 py-2 border rounded-lg" data-i18n-placeholder="merchantPage.withdraw.remarkPlaceholder" placeholder="备注信息">
+                                    class="m-input" data-i18n-placeholder="merchantPage.withdraw.remarkPlaceholder" placeholder="备注信息">
                             </div>
                         </div>
                         <div class="mt-4 flex items-center justify-between">
@@ -470,7 +517,7 @@
                     </div>
 
                     <!-- 提现记录 -->
-                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="m-card overflow-hidden">
                         <div class="p-4 border-b">
                             <h3 class="text-lg font-semibold" data-i18n="merchantPage.withdraw.withdrawHistory">提现记录</h3>
                         </div>
@@ -512,57 +559,57 @@
                 </div>
 
                 <!-- 设置 -->
-                <div v-if="currentTab === 'settings'" class="p-6">
-                    <h2 class="text-2xl font-bold mb-6" data-i18n="merchantPage.settings.title">商户设置</h2>
+                <div v-if="currentTab === 'settings'" class="p-6 md:p-8">
+                    <h2 class="m-page-title" data-i18n="merchantPage.settings.title">商户设置</h2>
 
                     <!-- 流式布局：桌面端2列，移动端1列 -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- 基本信息 -->
-                        <div class="bg-white rounded-lg shadow p-6">
+                        <div class="m-card p-6 m-form-narrow">
                             <h3 class="text-lg font-semibold mb-4" data-i18n="merchantPage.settings.basicInfo">基本信息</h3>
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.settings.merchantName">商户名称</label>
-                                    <input v-model="profile.name" class="w-full px-3 py-2 border rounded-lg">
+                                    <input v-model="profile.name" class="m-input">
                                 </div>
                                 <div>
                                     <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.settings.contactEmail">联系邮箱</label>
-                                    <input v-model="profile.email" type="email" class="w-full px-3 py-2 border rounded-lg">
+                                    <input v-model="profile.email" type="email" class="m-input">
                                 </div>
                                 <div>
                                     <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.settings.asyncNotifyUrl">异步通知URL</label>
-                                    <input v-model="profile.notify_url" class="w-full px-3 py-2 border rounded-lg" placeholder="https://example.com/notify">
+                                    <input v-model="profile.notify_url" class="m-input" placeholder="https://example.com/notify">
                                 </div>
                                 <div>
                                     <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.settings.syncReturnUrl">同步跳转URL</label>
-                                    <input v-model="profile.return_url" class="w-full px-3 py-2 border rounded-lg" placeholder="https://example.com/return">
+                                    <input v-model="profile.return_url" class="m-input" placeholder="https://example.com/return">
                                 </div>
-                                <button @click="updateProfile" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" data-i18n="merchantPage.settings.saveChanges">
+                                <button @click="updateProfile" class="m-btn m-btn-primary" data-i18n="merchantPage.settings.saveChanges">
                                     保存修改
                                 </button>
                             </div>
                         </div>
 
                         <!-- 修改密码 -->
-                        <div class="bg-white rounded-lg shadow p-6">
+                        <div class="m-card p-6 m-form-narrow">
                             <h3 class="text-lg font-semibold mb-4" data-i18n="merchantPage.settings.changePassword">修改密码</h3>
                             <div class="space-y-4">
                                 <div>
                                     <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.settings.currentPassword">当前密码</label>
-                                    <input v-model="passwordForm.old_password" type="password" class="w-full px-3 py-2 border rounded-lg">
+                                    <input v-model="passwordForm.old_password" type="password" class="m-input">
                                 </div>
                                 <div>
                                     <label class="block text-gray-700 text-sm font-bold mb-2" data-i18n="merchantPage.settings.newPassword">新密码</label>
-                                    <input v-model="passwordForm.new_password" type="password" class="w-full px-3 py-2 border rounded-lg">
+                                    <input v-model="passwordForm.new_password" type="password" class="m-input">
                                 </div>
-                                <button @click="changePassword" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" data-i18n="merchantPage.settings.changePassword">
+                                <button @click="changePassword" class="m-btn m-btn-primary" data-i18n="merchantPage.settings.changePassword">
                                     修改密码
                                 </button>
                             </div>
                         </div>
 
                         <!-- 钱包模式设置 -->
-                        <div class="bg-white rounded-lg shadow p-6">
+                        <div class="m-card p-6 m-form-narrow">
                             <h3 class="text-lg font-semibold mb-4" data-i18n="merchantPage.settings.walletMode">钱包模式</h3>
                             <p class="text-gray-500 text-sm mb-4" data-i18n="merchantPage.settings.walletModeDesc">选择收款时使用的钱包类型</p>
                             <div class="space-y-3">
@@ -618,7 +665,7 @@
                         </div>
 
                         <!-- Telegram绑定 -->
-                        <div class="bg-white rounded-lg shadow p-6">
+                        <div class="m-card p-6 m-form-narrow">
                             <h3 class="text-lg font-semibold mb-4" data-i18n="merchantPage.settings.telegramNotify">Telegram通知</h3>
                             <div v-if="profile.telegram_chat_id">
                                 <div class="flex items-center text-green-600 mb-2">
@@ -700,7 +747,7 @@
                         </div>
 
                         <!-- 监控客户端配置 -->
-                        <div class="bg-white rounded-lg shadow p-6">
+                        <div class="m-card p-6 m-form-narrow">
                             <h3 class="text-lg font-semibold mb-4">
                                 <i class="ri-qr-code-line mr-2"></i>监控客户端配置
                             </h3>
@@ -775,7 +822,7 @@
                     </div>
 
                     <!-- 提现地址管理 (独占一行) -->
-                    <div class="bg-white rounded-lg shadow p-6 mt-6">
+                    <div class="m-card p-6 mt-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-semibold">提现地址管理</h3>
                             <button @click="showAddressModal = true; editAddress = {chain: 'trc20'}"
@@ -827,7 +874,7 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">链类型</label>
-                        <select v-model="editWallet.chain" :disabled="editWallet.id" class="w-full px-3 py-2 border rounded-lg">
+                        <select v-model="editWallet.chain" :disabled="editWallet.id" class="m-input">
                             <option value="trx">TRX (Tron原生)</option>
                             <option value="trc20">TRC20 (Tron USDT)</option>
                             <option value="erc20">ERC20 (Ethereum)</option>
@@ -844,11 +891,11 @@
                     <div v-if="editWallet.chain !== 'wechat' && editWallet.chain !== 'alipay'">
                         <label class="block text-gray-700 text-sm font-bold mb-2">钱包地址</label>
                         <input v-model="editWallet.address" :disabled="editWallet.id"
-                            class="w-full px-3 py-2 border rounded-lg" placeholder="USDT钱包地址">
+                            class="m-input" placeholder="USDT钱包地址">
                     </div>
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">标签</label>
-                        <input v-model="editWallet.label" class="w-full px-3 py-2 border rounded-lg" placeholder="备注名称">
+                        <input v-model="editWallet.label" class="m-input" placeholder="备注名称">
                     </div>
                     <div v-if="editWallet.chain === 'wechat' || editWallet.chain === 'alipay'">
                         <label class="block text-gray-700 text-sm font-bold mb-2">收款码 (必填)</label>
@@ -858,7 +905,7 @@
                     </div>
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">状态</label>
-                        <select v-model="editWallet.status" class="w-full px-3 py-2 border rounded-lg">
+                        <select v-model="editWallet.status" class="m-input">
                             <option :value="1">启用</option>
                             <option :value="0">禁用</option>
                         </select>
@@ -878,7 +925,7 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">链类型</label>
-                        <select v-model="editAddress.chain" class="w-full px-3 py-2 border rounded-lg">
+                        <select v-model="editAddress.chain" class="m-input">
                             <option value="trc20">TRC20 (Tron USDT)</option>
                             <option value="bep20">BEP20 (BSC USDT)</option>
                             <option value="polygon">Polygon USDT</option>
@@ -888,12 +935,12 @@
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">钱包地址</label>
                         <input v-model="editAddress.address"
-                            class="w-full px-3 py-2 border rounded-lg"
+                            class="m-input"
                             placeholder="请输入USDT钱包地址">
                     </div>
                     <div>
                         <label class="block text-gray-700 text-sm font-bold mb-2">备注名称</label>
-                        <input v-model="editAddress.label" class="w-full px-3 py-2 border rounded-lg" placeholder="如：主钱包、备用钱包">
+                        <input v-model="editAddress.label" class="m-input" placeholder="如：主钱包、备用钱包">
                     </div>
                 </div>
                 <div class="bg-yellow-50 p-3 rounded-lg mt-4 text-sm text-yellow-700">
@@ -972,12 +1019,12 @@
 
         <!-- 测试支付模态框 -->
         <div v-if="showTestPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <div class="m-card w-full max-w-md p-6">
                 <h3 class="text-xl font-bold mb-4">发起测试支付</h3>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">支付方式</label>
-                        <select v-model="testPayment.type" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select v-model="testPayment.type" class="m-input">
                             <option value="usdt_trc20">USDT-TRC20</option>
                             <option value="usdt_erc20">USDT-ERC20</option>
                             <option value="usdt_bep20">USDT-BEP20</option>
@@ -993,7 +1040,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">产品货币</label>
-                        <select v-model="testPayment.currency" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select v-model="testPayment.currency" class="m-input">
                             <option value="USD">USD - 美元</option>
                             <option value="EUR">EUR - 欧元</option>
                             <option value="CNY">CNY - 人民币</option>
@@ -1002,13 +1049,13 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">金额([[ testPayment.currency ]])</label>
                         <input v-model="testPayment.money" type="number" step="0.01" min="0.01"
-                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="m-input"
                             placeholder="10">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">商品名称(可选)</label>
                         <input v-model="testPayment.name" type="text"
-                            class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="m-input"
                             placeholder="测试订单">
                     </div>
                 </div>

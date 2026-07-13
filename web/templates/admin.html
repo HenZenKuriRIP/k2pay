@@ -8,75 +8,261 @@
     <link rel="stylesheet" href="/static/css/i18n.css">
     <script src="/static/js/chart.min.js"></script>
     <style>
+        :root {
+            --bg: #f4f7fb;
+            --surface: #ffffff;
+            --surface-2: #f8fafc;
+            --border: #e8eef5;
+            --border-strong: #d5dee9;
+            --text: #0f172a;
+            --text-2: #475569;
+            --text-3: #94a3b8;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-soft: #eff6ff;
+            --success: #059669;
+            --success-soft: #ecfdf5;
+            --warning: #d97706;
+            --warning-soft: #fffbeb;
+            --danger: #dc2626;
+            --danger-soft: #fef2f2;
+            --sidebar-w: 248px;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.03);
+            --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
-        .login-container { min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 360px; }
-        .login-box h1 { text-align: center; color: #333; margin-bottom: 30px; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; color: #666; font-size: 14px; }
-        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
-        .form-group input:focus, .form-group select:focus { outline: none; border-color: #667eea; }
-        .login-btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        .login-btn:hover { opacity: 0.9; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        /* Login */
+        .login-container {
+            min-height: 100vh; display: flex; justify-content: center; align-items: center;
+            background: linear-gradient(160deg, #eef4ff 0%, #f4f7fb 45%, #e8f7f2 100%);
+            padding: 24px;
+        }
+        .login-box {
+            background: var(--surface); padding: 40px 36px; border-radius: 20px;
+            border: 1px solid var(--border); box-shadow: var(--shadow); width: 400px; max-width: 100%;
+        }
+        .login-box h1 { text-align: center; color: var(--text); margin-bottom: 28px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+        .login-btn {
+            width: 100%; padding: 12px 16px; background: var(--primary); color: #fff;
+            border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: background .15s ease;
+        }
+        .login-btn:hover { background: var(--primary-hover); }
 
-        /* Dashboard styles */
-        .app-container { display: none; }
-        .sidebar { position: fixed; left: 0; top: 0; width: 240px; height: 100vh; background: #1a1a2e; color: white; }
-        .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .sidebar-header h2 { font-size: 20px; }
-        .sidebar-menu { padding: 20px 0; }
-        .menu-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.7); text-decoration: none; transition: all 0.3s; cursor: pointer; }
-        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); color: white; }
-        .menu-icon { width: 20px; margin-right: 12px; text-align: center; font-size: 16px; }
-        .main-content { margin-left: 240px; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .header h1 { font-size: 24px; color: #333; }
-        .logout-btn { padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        /* Layout */
+        .app-container { display: none; min-height: 100vh; }
+        .sidebar {
+            position: fixed; left: 0; top: 0; width: var(--sidebar-w); height: 100vh;
+            background: #0b1220; color: #e2e8f0; display: flex; flex-direction: column; z-index: 50;
+            border-right: 1px solid rgba(255,255,255,.04);
+        }
+        .sidebar-header { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.06); }
+        .sidebar-header h2 {
+            font-size: 18px; font-weight: 700; letter-spacing: -.02em;
+            background: linear-gradient(90deg, #93c5fd, #6ee7b7); -webkit-background-clip: text;
+            background-clip: text; color: transparent;
+        }
+        .sidebar-menu { padding: 12px 10px; overflow-y: auto; flex: 1; }
+        .menu-item {
+            display: flex; align-items: center; padding: 10px 12px; margin-bottom: 2px;
+            color: #94a3b8; text-decoration: none; border-radius: 10px; cursor: pointer;
+            transition: all .15s ease; font-size: 13.5px; font-weight: 500;
+        }
+        .menu-item:hover { background: rgba(255,255,255,.05); color: #e2e8f0; }
+        .menu-item.active { background: rgba(37,99,235,.18); color: #fff; box-shadow: inset 0 0 0 1px rgba(37,99,235,.25); }
+        .menu-icon { width: 22px; margin-right: 10px; text-align: center; font-size: 14px; opacity: .9; }
+        .main-content { margin-left: var(--sidebar-w); padding: 28px 32px 48px; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; }
+        .header h1 { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -.02em; }
+        .logout-btn {
+            padding: 8px 14px; background: transparent; color: var(--text-2);
+            border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer;
+            font-size: 13px; font-weight: 500; transition: all .15s;
+        }
+        .logout-btn:hover { background: var(--danger-soft); color: var(--danger); border-color: #fecaca; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
-        .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .stat-card h3 { font-size: 14px; color: #666; margin-bottom: 8px; }
-        .stat-card .value { font-size: 28px; font-weight: bold; color: #333; }
-        .stat-card .sub { font-size: 12px; color: #999; margin-top: 4px; }
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+        @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+        .stat-card {
+            background: var(--surface); padding: 20px; border-radius: var(--radius);
+            border: 1px solid var(--border); box-shadow: var(--shadow);
+        }
+        .stat-card h3 { font-size: 13px; color: var(--text-2); margin-bottom: 8px; font-weight: 500; }
+        .stat-card .value { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -.03em; }
+        .stat-card .sub { font-size: 12px; color: var(--text-3); margin-top: 6px; }
 
-        .card { background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .card-header { padding: 16px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .card-header h2 { font-size: 16px; color: #333; }
+        /* Card */
+        .card {
+            background: var(--surface); border-radius: var(--radius);
+            border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 20px;
+        }
+        .card-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+        }
+        .card-header h2 { font-size: 15px; color: var(--text); font-weight: 650; }
         .card-body { padding: 20px; }
 
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f9f9f9; font-weight: 600; color: #666; font-size: 13px; }
-        td { font-size: 14px; color: #333; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-        .badge-success { background: #e8f5e9; color: #2e7d32; }
-        .badge-warning { background: #fff3e0; color: #e65100; }
-        .badge-danger { background: #ffebee; color: #c62828; }
+        /* Forms — constrained, never full-bleed ugly */
+        .form-group { margin-bottom: 16px; max-width: 100%; }
+        .form-group label {
+            display: block; margin-bottom: 6px; color: var(--text-2);
+            font-size: 13px; font-weight: 550;
+        }
+        .form-group input, .form-group select, .form-group textarea,
+        .modal input, .modal select, .modal textarea {
+            width: 100%; max-width: 100%; padding: 10px 12px;
+            border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+            font-size: 14px; background: var(--surface); color: var(--text);
+            transition: border-color .15s, box-shadow .15s; font-family: inherit;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus,
+        .modal input:focus, .modal select:focus {
+            outline: none; border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+        }
+        .form-group small, .form-hint { display: block; margin-top: 6px; color: var(--text-3); font-size: 12px; line-height: 1.45; }
+        .form-row {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px 20px; margin-bottom: 4px; max-width: 880px;
+        }
+        @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
+        .form-row-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; max-width: 960px; }
+        .settings-section { max-width: 880px; }
+        .settings-section h3 {
+            margin: 28px 0 14px; color: var(--text); font-size: 14px; font-weight: 650;
+            border-bottom: 1px solid var(--border); padding-bottom: 10px;
+        }
 
-        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        /* Table */
+        table, .data-table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+        th {
+            background: var(--surface-2); font-weight: 600; color: var(--text-2);
+            font-size: 12px; text-transform: none; letter-spacing: .01em; white-space: nowrap;
+        }
+        td { font-size: 13.5px; color: var(--text); vertical-align: middle; }
+        tr:hover td { background: #fafcff; }
+        .table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
+
+        .badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 550;
+        }
+        .badge-success { background: var(--success-soft); color: var(--success); }
+        .badge-warning { background: var(--warning-soft); color: var(--warning); }
+        .badge-danger { background: var(--danger-soft); color: var(--danger); }
+        .badge-info { background: var(--primary-soft); color: var(--primary); }
+        .badge-muted { background: #f1f5f9; color: #64748b; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 14px; border: 1px solid transparent; border-radius: var(--radius-sm);
+            cursor: pointer; font-size: 13px; font-weight: 550; font-family: inherit;
+            transition: all .15s ease; background: #f1f5f9; color: var(--text-2); line-height: 1.2;
+        }
+        .btn:hover { background: #e2e8f0; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-outline {
+            background: transparent; border-color: var(--border-strong); color: var(--text-2);
+        }
+        .btn-outline:hover { background: var(--surface-2); border-color: #cbd5e1; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+        .btn-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 
         .page { display: none; }
-        .page.active { display: block; }
+        .page.active { display: block; animation: fadeIn .2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-        .form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        /* Modal */
+        .modal {
+            display: none; position: fixed; inset: 0; background: rgba(15,23,42,.45);
+            justify-content: center; align-items: center; z-index: 1000; padding: 20px;
+            backdrop-filter: blur(4px);
+        }
         .modal.show { display: flex; }
-        .modal-content { background: white; border-radius: 12px; padding: 24px; width: 480px; max-width: 90%; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+        .modal-content {
+            background: var(--surface); border-radius: 16px; padding: 24px;
+            width: 520px; max-width: 100%; max-height: 90vh; overflow-y: auto;
+            border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(15,23,42,.15);
+        }
+        .modal-content.modal-lg { width: 640px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+        .modal-header h3 { font-size: 16px; font-weight: 650; }
+        .modal-close {
+            background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 8px;
+            font-size: 18px; cursor: pointer; color: var(--text-3); line-height: 1;
+        }
+        .modal-close:hover { background: #e2e8f0; color: var(--text); }
 
-        /* Filter form styles */
-        .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
-        .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-        .filter-bar input:focus, .filter-bar select:focus { outline: none; border-color: #667eea; }
+        /* Filter bar */
+        .filter-bar {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            margin-bottom: 16px; padding: 14px; background: var(--surface-2);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+        }
+        .filter-bar input, .filter-bar select {
+            padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 8px;
+            font-size: 13px; background: #fff; min-width: 0; max-width: 200px;
+        }
+        .filter-bar input:focus, .filter-bar select:focus {
+            outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+        }
         .filter-bar input { min-width: 120px; }
-        .filter-bar select { min-width: 100px; background: white; }
-        .trend-period { background: #f3f4f6; color: #374151; border: none; }
-        .trend-period.active { background: #667eea; color: white; }
-        .trend-period:hover { opacity: 0.9; }
+        .filter-bar select { min-width: 100px; }
+        .trend-period { background: #f1f5f9; color: var(--text-2); border: none; }
+        .trend-period.active { background: var(--primary); color: #fff; }
+        .trend-period:hover { opacity: .92; }
+
+        /* Health indicators */
+        .health-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            vertical-align: middle; flex-shrink: 0;
+        }
+        .health-dot.healthy { background: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.15); }
+        .health-dot.degraded { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.15); }
+        .health-dot.down, .health-dot.stopped { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.15); }
+        .health-dot.disabled, .health-dot.unknown { background: #94a3b8; }
+        .health-score {
+            font-variant-numeric: tabular-nums; font-size: 12px; color: var(--text-3);
+            cursor: help;
+        }
+
+        /* Chain cards grid optional */
+        .chain-meta { font-size: 12px; color: var(--text-3); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Scrollbar */
+        .sidebar-menu::-webkit-scrollbar { width: 4px; }
+        .sidebar-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 4px; }
+
+        /* Pagination */
+        .pagination { display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap; }
+        .pagination button {
+            padding: 6px 12px; border: 1px solid var(--border-strong); background: #fff;
+            border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-2);
+        }
+        .pagination button.active, .pagination button:hover { border-color: var(--primary); color: var(--primary); }
+
+        @media (max-width: 900px) {
+            .sidebar { transform: translateX(-100%); }
+            .main-content { margin-left: 0; padding: 16px; }
+        }
     </style>
 </head>
 <body>
@@ -401,17 +587,24 @@
                 <div class="card">
                     <div class="card-header">
                         <h2 data-i18n="adminPage.chains.management">链监控管理</h2>
-                        <button class="btn btn-primary btn-sm" onclick="loadChains()" data-i18n="adminPage.chains.refreshStatus">刷新状态</button>
+                        <div class="btn-group">
+                            <button class="btn btn-outline btn-sm" onclick="checkAllChainHealth()"><i class="fas fa-heartbeat"></i> 健康检查</button>
+                            <button class="btn btn-outline btn-sm" onclick="loadChains()" data-i18n="adminPage.chains.refreshStatus">刷新状态</button>
+                            <button class="btn btn-primary btn-sm" onclick="showAddChain()"><i class="fas fa-plus"></i> 添加链</button>
+                        </div>
                     </div>
                     <div class="card-body">
-                        <p style="color:#666;margin-bottom:16px;" data-i18n="adminPage.chains.description">动态启用或禁用链监控，减少不需要的链的资源开销。</p>
+                        <p style="color:var(--text-2);margin-bottom:16px;font-size:13px;" data-i18n="adminPage.chains.description">管理区块链监控：启用/禁用、编辑 RPC 与扫描参数、添加未来新链，并实时检查节点健康度。</p>
+                        <div class="table-wrap">
                         <table>
                             <thead>
                                 <tr>
                                     <th data-i18n="chain.name">链</th>
+                                    <th>健康度</th>
                                     <th data-i18n="common.status">状态</th>
                                     <th data-i18n="adminPage.chains.tableHeader.runningStatus">运行状态</th>
                                     <th data-i18n="adminPage.chains.tableHeader.walletCount">账号数量</th>
+                                    <th>RPC / 合约</th>
                                     <th data-i18n="adminPage.chains.tableHeader.scanInterval">扫描间隔</th>
                                     <th data-i18n="common.action">操作</th>
                                 </tr>
@@ -419,6 +612,7 @@
                             <tbody id="chainsTable">
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -481,7 +675,7 @@
                     <div class="card-header">
                         <h2 data-i18n="settings.title">系统设置</h2>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body settings-section">
                         <div class="form-row">
                             <div class="form-group">
                                 <label data-i18n="settings.orderExpire">订单过期时间(分钟)</label>
@@ -496,16 +690,16 @@
                             <div class="form-group">
                                 <label data-i18n="adminPage.settings.systemWalletFeeRate">系统收款码手续费率</label>
                                 <input type="text" id="cfg_system_wallet_fee_rate" data-i18n-placeholder="adminPage.settings.feeRatePlaceholder">
-                                <small style="color:#666;font-size:12px;" data-i18n="adminPage.settings.systemWalletFeeRateDesc">使用系统钱包收款时的手续费率，收款金额扣除手续费后入商户余额</small>
+                                <small class="form-hint" data-i18n="adminPage.settings.systemWalletFeeRateDesc">使用系统钱包收款时的手续费率，收款金额扣除手续费后入商户余额</small>
                             </div>
                             <div class="form-group">
                                 <label data-i18n="adminPage.settings.personalWalletFeeRate">个人收款码手续费率</label>
                                 <input type="text" id="cfg_personal_wallet_fee_rate" data-i18n-placeholder="adminPage.settings.feeRatePlaceholder">
-                                <small style="color:#666;font-size:12px;" data-i18n="adminPage.settings.personalWalletFeeRateDesc">使用个人钱包收款时的手续费率，收款直接到商户账户，手续费从余额扣除</small>
+                                <small class="form-hint" data-i18n="adminPage.settings.personalWalletFeeRateDesc">使用个人钱包收款时的手续费率，收款直接到商户账户，手续费从余额扣除</small>
                             </div>
                         </div>
 
-                        <h3 style="margin-top:24px;margin-bottom:16px;color:#333;border-bottom:1px solid #eee;padding-bottom:8px;" data-i18n="adminPage.settings.telegramBotSettings">Telegram 机器人设置</h3>
+                        <h3 data-i18n="adminPage.settings.telegramBotSettings">Telegram 机器人设置</h3>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>启用 Telegram 服务</label>
@@ -558,16 +752,18 @@
                             <span id="telegramStatusText"></span>
                         </div>
 
-                        <h3 style="margin-top:24px;margin-bottom:16px;color:#333;border-bottom:1px solid #eee;padding-bottom:8px;">官方支付（支付宝/微信）</h3>
-                        <p style="color:#666;font-size:13px;margin-bottom:12px;line-height:1.5;">
-                            模式选「官方」时走开放平台接口；未配置或失败时自动回退个人收款码。
-                            回调地址：<code id="officialNotifyHint">https://你的域名/api/channel/notify/alipay</code>
-                        </p>
+                        <h3>官方支付 · 支付宝商户</h3>
+                        <div style="background:var(--primary-soft);border:1px solid #bfdbfe;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--text-2);line-height:1.6;">
+                            <strong style="color:var(--primary);">接入说明</strong>：将支付宝开放平台「当面付 / 预下单 alipay.trade.precreate」接入本系统。
+                            模式选「官方接口」后，用户扫官方收款码支付，异步回调自动入账；配置不全或下单失败时<strong>自动回退个人收款码</strong>。<br>
+                            回调地址：<code id="officialNotifyHint" style="background:#fff;padding:2px 6px;border-radius:4px;">https://你的域名/api/channel/notify/alipay</code>
+                            <span id="officialPayStatusBadge" style="margin-left:8px;"></span>
+                        </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>站点公网 URL (site_url)</label>
                                 <input type="text" id="pay_site_url" placeholder="https://pay.example.com">
-                                <small style="color:#666;font-size:12px;">必须 HTTPS 公网可访问，用于拼官方回调</small>
+                                <small class="form-hint">必须公网可访问（建议 HTTPS），用于拼官方异步回调 URL</small>
                             </div>
                         </div>
                         <div class="form-row">
@@ -575,67 +771,89 @@
                                 <label>支付宝模式</label>
                                 <select id="pay_alipay_mode">
                                     <option value="personal">个人收款码</option>
-                                    <option value="official">官方接口</option>
+                                    <option value="official">官方商户接口（推荐）</option>
                                 </select>
+                                <small class="form-hint">官方模式需在开放平台开通「当面付」并配置应用公私钥</small>
                             </div>
                             <div class="form-group">
                                 <label>支付宝沙箱</label>
                                 <select id="pay_alipay_sandbox">
-                                    <option value="0">关闭</option>
-                                    <option value="1">开启</option>
+                                    <option value="0">正式环境</option>
+                                    <option value="1">沙箱环境</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>支付宝 AppID</label>
-                                <input type="text" id="pay_alipay_app_id">
+                                <input type="text" id="pay_alipay_app_id" placeholder="开放平台应用 APPID">
                             </div>
                             <div class="form-group">
-                                <label>支付宝应用私钥</label>
-                                <textarea id="pay_alipay_private_key" rows="3" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;" placeholder="留空表示不修改已保存密钥"></textarea>
+                                <label>应用私钥（商户持有）</label>
+                                <textarea id="pay_alipay_private_key" rows="3" style="width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px;font-family:ui-monospace,monospace;" placeholder="留空表示不修改已保存密钥；支持 PEM 或纯 Base64"></textarea>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group" style="flex:1;">
-                                <label>支付宝公钥（验签）</label>
-                                <textarea id="pay_alipay_public_key" rows="3" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;" placeholder="留空表示不修改"></textarea>
+                                <label>支付宝公钥（开放平台 · 用于回调验签）</label>
+                                <textarea id="pay_alipay_public_key" rows="3" style="width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px;font-family:ui-monospace,monospace;" placeholder="留空表示不修改；请填写「支付宝公钥」而非应用公钥"></textarea>
                             </div>
+                        </div>
+                        <div class="btn-group" style="margin-bottom:8px;">
+                            <button type="button" class="btn btn-outline" onclick="testAlipayOfficial()"><i class="fas fa-vial"></i> 测试支付宝连通</button>
+                        </div>
+                        <div id="alipayTestResult" style="display:none;margin-bottom:16px;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.55;"></div>
+
+                        <h3>官方支付 · 微信商户</h3>
+                        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--text-2);line-height:1.6;">
+                            <strong style="color:#059669;">接入说明</strong>：接入微信支付商户平台 <strong>APIv3 Native 扫码</strong>（<code>/v3/pay/transactions/native</code>）。
+                            模式选「官方」后生成微信官方收款码，支付成功异步回调自动入账；失败时<strong>自动回退个人收款码</strong>。<br>
+                            回调地址：<code id="wechatNotifyHint" style="background:#fff;padding:2px 6px;border-radius:4px;">https://你的域名/api/channel/notify/wechat</code>
+                            <span id="wechatPayStatusBadge" style="margin-left:8px;"></span>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>微信模式</label>
                                 <select id="pay_wechat_mode">
                                     <option value="personal">个人收款码</option>
-                                    <option value="official">官方接口 (APIv3 Native)</option>
+                                    <option value="official">官方商户接口（APIv3 Native）</option>
                                 </select>
+                                <small class="form-hint">需在微信商户平台开通 Native 支付，并配置 API 证书与 APIv3 密钥</small>
                             </div>
                             <div class="form-group">
                                 <label>微信 AppID</label>
-                                <input type="text" id="pay_wechat_app_id">
+                                <input type="text" id="pay_wechat_app_id" placeholder="公众号/小程序/应用 AppID">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>微信商户号 MchID</label>
-                                <input type="text" id="pay_wechat_mch_id">
+                                <input type="text" id="pay_wechat_mch_id" placeholder="10 位商户号">
                             </div>
                             <div class="form-group">
-                                <label>证书序列号</label>
-                                <input type="text" id="pay_wechat_serial_no">
+                                <label>商户 API 证书序列号</label>
+                                <input type="text" id="pay_wechat_serial_no" placeholder="证书管理中查看序列号">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>APIv3 密钥 (32位)</label>
-                                <input type="text" id="pay_wechat_api_v3_key" placeholder="留空表示不修改">
+                                <label>APIv3 密钥（32 位）</label>
+                                <input type="text" id="pay_wechat_api_v3_key" placeholder="留空表示不修改；用于回调解密">
+                                <small class="form-hint">在商户平台「账户中心 → API 安全」设置，必须 32 位</small>
                             </div>
                             <div class="form-group">
-                                <label>商户 API 私钥</label>
-                                <textarea id="pay_wechat_private_key" rows="3" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;" placeholder="留空表示不修改"></textarea>
+                                <label>商户 API 私钥（apiclient_key.pem）</label>
+                                <textarea id="pay_wechat_private_key" rows="3" style="width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px;font-family:ui-monospace,monospace;" placeholder="留空表示不修改；粘贴 PEM 内容"></textarea>
                             </div>
                         </div>
-                        <button class="btn" style="background:#28a745;color:white;margin-bottom:16px;" onclick="saveOfficialPay()">保存官方支付配置</button>
+                        <div class="btn-group" style="margin-bottom:8px;">
+                            <button type="button" class="btn btn-outline" onclick="testWechatOfficial()"><i class="fas fa-vial"></i> 测试微信连通</button>
+                        </div>
+                        <div id="wechatTestResult" style="display:none;margin-bottom:16px;padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.55;"></div>
+
+                        <div class="btn-group" style="margin-bottom:20px;">
+                            <button type="button" class="btn btn-success" onclick="saveOfficialPay()">保存官方支付配置</button>
+                        </div>
 
                         <h3 style="margin-top:24px;margin-bottom:16px;color:#333;border-bottom:1px solid #eee;padding-bottom:8px;" data-i18n="adminPage.settings.customerServiceSettings">客服链接设置</h3>
                         <div class="form-row">
@@ -1359,10 +1577,11 @@
         async function loadMerchants() {
             const data = await api('/admin/api/merchants');
             if (data.code === 1) {
-                // 存储商户数据
-                data.data.forEach(m => merchantsData[m.id] = m);
+                // 存储商户数据（排除系统内部商户，防止历史脏数据）
+                const list = (data.data || []).filter(m => m && m.id > 0 && m.pid !== 'SYSTEM');
+                list.forEach(m => merchantsData[m.id] = m);
                 const tbody = document.getElementById('merchantsTable');
-                tbody.innerHTML = data.data.map(m => `
+                tbody.innerHTML = list.map(m => `
                     <tr>
                         <td>${m.pid}</td>
                         <td>${m.name}</td>
@@ -1824,8 +2043,30 @@
             document.getElementById('pay_wechat_private_key').value = '';
             document.getElementById('pay_wechat_private_key').placeholder = d.wechat_configured ? ('已配置 ' + (d.wechat_private_key || '')) : '粘贴商户API私钥';
             const base = (d.site_url || 'https://你的域名').replace(/\/$/, '');
-            document.getElementById('officialNotifyHint').textContent =
-                base + '/api/channel/notify/alipay 与 ' + base + '/api/channel/notify/wechat';
+            const hint = document.getElementById('officialNotifyHint');
+            if (hint) hint.textContent = base + '/api/channel/notify/alipay';
+            const whint = document.getElementById('wechatNotifyHint');
+            if (whint) whint.textContent = base + '/api/channel/notify/wechat';
+            const badge = document.getElementById('officialPayStatusBadge');
+            if (badge) {
+                if (d.alipay_mode === 'official' && d.alipay_configured) {
+                    badge.innerHTML = '<span class="badge badge-success">支付宝官方已启用</span>';
+                } else if (d.alipay_mode === 'official') {
+                    badge.innerHTML = '<span class="badge badge-warning">官方模式·密钥未配齐</span>';
+                } else {
+                    badge.innerHTML = '<span class="badge badge-muted">个人码模式</span>';
+                }
+            }
+            const wbadge = document.getElementById('wechatPayStatusBadge');
+            if (wbadge) {
+                if (d.wechat_mode === 'official' && d.wechat_configured) {
+                    wbadge.innerHTML = '<span class="badge badge-success">微信官方已启用</span>';
+                } else if (d.wechat_mode === 'official') {
+                    wbadge.innerHTML = '<span class="badge badge-warning">官方模式·参数未配齐</span>';
+                } else {
+                    wbadge.innerHTML = '<span class="badge badge-muted">个人码模式</span>';
+                }
+            }
         }
 
         async function saveOfficialPay() {
@@ -1850,6 +2091,54 @@
             } else {
                 showToast(data.msg || '保存失败', 'error');
             }
+        }
+
+        function renderOfficialTestResult(boxId, data) {
+            const box = document.getElementById(boxId);
+            if (!box) {
+                alert((data && data.msg) || '测试完成');
+                return;
+            }
+            box.style.display = 'block';
+            const ok = data && data.code === 1 && data.data && data.data.ok;
+            box.style.background = ok ? 'var(--success-soft)' : 'var(--danger-soft)';
+            box.style.border = ok ? '1px solid #a7f3d0' : '1px solid #fecaca';
+            let html = '<strong>' + ((data && data.msg) || '') + '</strong>';
+            if (data && data.data && data.data.checks) {
+                html += '<ul style="margin:8px 0 0 18px;padding:0;">';
+                for (const c of data.data.checks) {
+                    html += `<li>${c.pass ? '✓' : '✗'} <b>${c.name}</b>：${c.detail || ''}</li>`;
+                }
+                html += '</ul>';
+            }
+            if (data && data.data && data.data.notify_url) {
+                html += `<div style="margin-top:8px;color:var(--text-3);">回调：${data.data.notify_url}</div>`;
+            }
+            box.innerHTML = html;
+        }
+
+        async function testAlipayOfficial() {
+            const box = document.getElementById('alipayTestResult');
+            if (box) {
+                box.style.display = 'block';
+                box.style.background = '#f8fafc';
+                box.style.border = '1px solid var(--border)';
+                box.innerHTML = '正在测试支付宝开放平台连通…';
+            }
+            const data = await api('/admin/api/official-pay/test-alipay', { method: 'POST', body: '{}' });
+            renderOfficialTestResult('alipayTestResult', data);
+        }
+
+        async function testWechatOfficial() {
+            const box = document.getElementById('wechatTestResult');
+            if (box) {
+                box.style.display = 'block';
+                box.style.background = '#f8fafc';
+                box.style.border = '1px solid var(--border)';
+                box.innerHTML = '正在测试微信支付商户平台连通…';
+            }
+            const data = await api('/admin/api/official-pay/test-wechat', { method: 'POST', body: '{}' });
+            renderOfficialTestResult('wechatTestResult', data);
         }
 
         async function saveSettings() {
@@ -1931,54 +2220,74 @@
         }
 
         async function showAddWallet() {
-            // 先加载商户列表
+            // 先加载商户列表（后端已排除 SYSTEM 系统商户，前端再做一层防护）
             const merchantsData = await api('/admin/api/merchants');
-            let merchantOptions = '<option value="0">系统钱包 (所有商户可用)</option>';
+            let merchantOptions = '<option value="0">系统钱包（所有商户可用）</option>';
             if (merchantsData.code === 1 && merchantsData.data) {
                 merchantsData.data.forEach(m => {
-                    merchantOptions += `<option value="${m.id}">${m.pid} - ${m.name}</option>`;
+                    // 排除系统内部商户，避免与「系统钱包」选项重复
+                    if (!m.id || m.id === 0 || m.pid === 'SYSTEM') return;
+                    merchantOptions += `<option value="${m.id}">${m.pid} - ${m.name || ''}</option>`;
                 });
+            }
+
+            // 链选项：内置 + 动态添加的链
+            let chainOptions = '';
+            const chainsData = await api('/admin/api/chains');
+            if (chainsData.code === 1 && chainsData.data) {
+                const preferred = ['trx','trc20','erc20','bep20','polygon','optimism','arbitrum','avalanche','base','wechat','alipay'];
+                const keys = Object.keys(chainsData.data);
+                const ordered = [...preferred.filter(c => chainsData.data[c]), ...keys.filter(c => !preferred.includes(c)).sort()];
+                for (const c of ordered) {
+                    const info = chainsData.data[c];
+                    const name = (info && info.name) || chainNames[c] || c.toUpperCase();
+                    chainOptions += `<option value="${c}">${name}</option>`;
+                }
+            }
+            if (!chainOptions) {
+                chainOptions = `
+                    <option value="trx">TRX (Tron)</option>
+                    <option value="trc20">TRC20 (Tron USDT)</option>
+                    <option value="erc20">ERC20 (Ethereum)</option>
+                    <option value="bep20">BEP20 (BSC)</option>
+                    <option value="polygon">Polygon</option>
+                    <option value="optimism">Optimism</option>
+                    <option value="arbitrum">Arbitrum</option>
+                    <option value="avalanche">Avalanche</option>
+                    <option value="base">Base</option>
+                    <option value="wechat">微信收款</option>
+                    <option value="alipay">支付宝收款</option>`;
             }
 
             document.getElementById('modalTitle').textContent = '添加钱包';
             document.getElementById('modalBody').innerHTML = `
                 <div class="form-group">
                     <label>归属商户</label>
-                    <select id="walletMerchant" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;">
-                        ${merchantOptions}
-                    </select>
+                    <select id="walletMerchant">${merchantOptions}</select>
+                    <small class="form-hint">系统钱包对所有商户可用；选择具体商户则为该商户专属钱包</small>
                 </div>
                 <div class="form-group">
                     <label>类型</label>
-                    <select id="walletChain" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;" onchange="onChainChange()">
-                        <option value="trx">TRX (Tron)</option>
-                        <option value="trc20">TRC20 (Tron USDT)</option>
-                        <option value="erc20">ERC20 (Ethereum)</option>
-                        <option value="bep20">BEP20 (BSC)</option>
-                        <option value="polygon">Polygon</option>
-                        <option value="optimism">Optimism</option>
-                        <option value="arbitrum">Arbitrum</option>
-                        <option value="avalanche">Avalanche</option>
-                        <option value="base">Base</option>
-                        <option value="wechat">微信收款</option>
-                        <option value="alipay">支付宝收款</option>
-                    </select>
+                    <select id="walletChain" onchange="onChainChange()">${chainOptions}</select>
                 </div>
                 <div class="form-group" id="addressGroup">
                     <label>钱包地址 / 收款账号</label>
-                    <input type="text" id="walletAddress" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;" placeholder="USDT钱包地址">
+                    <input type="text" id="walletAddress" placeholder="USDT钱包地址">
                 </div>
                 <div class="form-group" id="qrcodeGroup" style="display:none;">
                     <label>收款码图片</label>
-                    <input type="file" id="qrcodeFile" accept="image/*" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;">
-                    <img id="qrcodePreview" style="max-width:200px;margin-top:10px;display:none;">
+                    <input type="file" id="qrcodeFile" accept="image/*">
+                    <img id="qrcodePreview" style="max-width:200px;margin-top:10px;display:none;border-radius:8px;border:1px solid var(--border);">
                     <input type="hidden" id="walletQRCode">
                 </div>
                 <div class="form-group">
                     <label>标签(可选)</label>
-                    <input type="text" id="walletLabel" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;">
+                    <input type="text" id="walletLabel" placeholder="备注名称">
                 </div>
-                <button class="btn btn-primary" onclick="addWallet()">添加</button>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="addWallet()">添加</button>
+                    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+                </div>
             `;
             document.getElementById('modal').classList.add('show');
 
@@ -2076,6 +2385,8 @@
 
         function closeModal() {
             document.getElementById('modal').classList.remove('show');
+            const mc = document.querySelector('#modal .modal-content');
+            if (mc) mc.classList.remove('modal-lg');
         }
 
         // Chain management
@@ -2088,43 +2399,117 @@
             'optimism': 'Optimism',
             'arbitrum': 'Arbitrum',
             'avalanche': 'Avalanche',
-            'base': 'Base'
+            'base': 'Base',
+            'wechat': '微信支付',
+            'alipay': '支付宝'
         };
+        let chainsCache = {};
+        let chainHealthCache = {};
+
+        function scoreColor(score) {
+            if (score >= 90) return '#059669';
+            if (score >= 75) return '#10b981';
+            if (score >= 60) return '#d97706';
+            if (score >= 40) return '#ea580c';
+            return '#dc2626';
+        }
+
+        function healthBadgeHtml(chain) {
+            const h = chainHealthCache[chain];
+            if (!h) {
+                return '<span class="health-score"><span class="health-dot unknown"></span>未检测</span>';
+            }
+            const st = h.status || 'unknown';
+            const score = typeof h.score === 'number' ? h.score : null;
+            const grade = h.grade || '';
+            // 分项明细 tooltip
+            let tip = h.message || '';
+            if (h.breakdown) {
+                const parts = [];
+                for (const k of Object.keys(h.breakdown)) {
+                    const b = h.breakdown[k];
+                    if (!b) continue;
+                    parts.push(`${b.label || k} ${b.score}/${b.max}${b.detail ? ' (' + b.detail + ')' : ''}`);
+                }
+                if (parts.length) tip = parts.join('\n');
+            }
+            tip = String(tip).replace(/"/g, '&quot;');
+            if (score != null) {
+                const color = scoreColor(score);
+                const barW = Math.max(0, Math.min(100, score));
+                return `<div class="health-score" title="${tip}" style="min-width:120px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <span class="health-dot ${st}"></span>
+                        <strong style="color:${color};font-size:15px;font-variant-numeric:tabular-nums;">${score}</strong>
+                        <span style="color:var(--text-3);font-size:11px;">/100 ${grade}</span>
+                    </div>
+                    <div style="height:4px;background:#e2e8f0;border-radius:99px;overflow:hidden;">
+                        <div style="height:100%;width:${barW}%;background:${color};border-radius:99px;transition:width .3s;"></div>
+                    </div>
+                </div>`;
+            }
+            return `<span class="health-score" title="${tip}">
+                <span class="health-dot ${st}"></span>${grade || st}
+            </span>`;
+        }
 
         async function loadChains() {
             const data = await api('/admin/api/chains');
-            if (data.code === 1) {
-                const tbody = document.getElementById('chainsTable');
-                const chainOrder = ['trx', 'trc20', 'erc20', 'bep20', 'polygon', 'optimism', 'arbitrum', 'avalanche', 'base'];
-                let html = '';
-
-                for (const chain of chainOrder) {
-                    const info = data.data[chain];
-                    if (!info) continue;
-
-                    const enabledBadge = info.enabled ?
-                        '<span class="badge badge-success">已启用</span>' :
-                        '<span class="badge badge-danger">已禁用</span>';
-                    const runningBadge = info.running ?
-                        '<span class="badge badge-success">运行中</span>' :
-                        '<span class="badge badge-warning">已停止</span>';
-                    const actionBtn = info.enabled ?
-                        `<button class="btn btn-sm" style="background:#f44336;color:white;" onclick="toggleChain('${chain}', false)">禁用</button>` :
-                        `<button class="btn btn-sm btn-primary" onclick="toggleChain('${chain}', true)">启用</button>`;
-
-                    html += `
-                        <tr>
-                            <td><strong>${chainNames[chain] || chain.toUpperCase()}</strong></td>
-                            <td>${enabledBadge}</td>
-                            <td>${runningBadge}</td>
-                            <td>${info.wallet_count || 0}</td>
-                            <td>${info.interval}秒</td>
-                            <td>${actionBtn}</td>
-                        </tr>
-                    `;
-                }
-                tbody.innerHTML = html;
+            if (data.code !== 1) return;
+            chainsCache = data.data || {};
+            const tbody = document.getElementById('chainsTable');
+            const preferred = ['trx', 'trc20', 'erc20', 'bep20', 'polygon', 'optimism', 'arbitrum', 'avalanche', 'base', 'wechat', 'alipay'];
+            const allKeys = Object.keys(chainsCache);
+            const ordered = [
+                ...preferred.filter(c => chainsCache[c]),
+                ...allKeys.filter(c => !preferred.includes(c)).sort()
+            ];
+            let html = '';
+            for (const chain of ordered) {
+                const info = chainsCache[chain];
+                if (!info) continue;
+                const displayName = info.name || chainNames[chain] || chain.toUpperCase();
+                const passive = !!info.passive;
+                const enabledBadge = info.enabled
+                    ? '<span class="badge badge-success">已启用</span>'
+                    : '<span class="badge badge-muted">已禁用</span>';
+                const runningBadge = passive
+                    ? '<span class="badge badge-info">被动推送</span>'
+                    : (info.running
+                        ? '<span class="badge badge-success">运行中</span>'
+                        : '<span class="badge badge-warning">已停止</span>');
+                const toggleBtn = info.enabled
+                    ? `<button class="btn btn-sm btn-danger" onclick="toggleChain('${chain}', false)">禁用</button>`
+                    : `<button class="btn btn-sm btn-primary" onclick="toggleChain('${chain}', true)">启用</button>`;
+                const editBtn = passive
+                    ? ''
+                    : `<button class="btn btn-sm btn-outline" onclick="showEditChain('${chain}')">编辑</button>`;
+                const healthBtn = passive
+                    ? ''
+                    : `<button class="btn btn-sm btn-outline" onclick="checkChainHealth('${chain}')">检测</button>`;
+                const delBtn = (!info.is_builtin && !passive)
+                    ? `<button class="btn btn-sm btn-outline" style="color:var(--danger)" onclick="deleteChain('${chain}')">删除</button>`
+                    : '';
+                const rpcMeta = passive
+                    ? '<span class="chain-meta">—</span>'
+                    : `<div class="chain-meta" title="${(info.rpc || '') + (info.contract || info.contract_address ? ' | ' + (info.contract || info.contract_address) : '')}">${info.rpc || '—'}${info.contract || info.contract_address ? '<br>合约: ' + (info.contract || info.contract_address) : ''}</div>`;
+                const interval = passive ? '—' : ((info.scan_interval || info.interval || 0) + '秒');
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${displayName}</strong>
+                            <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${chain}${info.chain_type ? ' · ' + info.chain_type : ''}${info.is_builtin ? ' · 内置' : ' · 自定义'}</div>
+                        </td>
+                        <td id="health-${chain}">${healthBadgeHtml(chain)}</td>
+                        <td>${enabledBadge}</td>
+                        <td>${runningBadge}</td>
+                        <td>${info.wallet_count || 0}</td>
+                        <td>${rpcMeta}</td>
+                        <td>${interval}</td>
+                        <td><div class="btn-group">${editBtn}${healthBtn}${toggleBtn}${delBtn}</div></td>
+                    </tr>`;
             }
+            tbody.innerHTML = html;
         }
 
         async function toggleChain(chain, enable) {
@@ -2134,6 +2519,163 @@
                 loadChains();
             } else {
                 alert(data.msg);
+            }
+        }
+
+        async function checkChainHealth(chain) {
+            const data = await api(`/admin/api/chains/${chain}/health`);
+            if (data.code === 1) {
+                chainHealthCache[chain] = data.data;
+                const el = document.getElementById('health-' + chain);
+                if (el) el.innerHTML = healthBadgeHtml(chain);
+            } else {
+                alert(data.msg || '健康检查失败');
+            }
+        }
+
+        async function checkAllChainHealth() {
+            const data = await api('/admin/api/chains/health');
+            if (data.code === 1) {
+                chainHealthCache = data.data || {};
+                for (const chain of Object.keys(chainHealthCache)) {
+                    const el = document.getElementById('health-' + chain);
+                    if (el) el.innerHTML = healthBadgeHtml(chain);
+                }
+            } else {
+                alert(data.msg || '健康检查失败');
+            }
+        }
+
+        function showAddChain() {
+            document.getElementById('modalTitle').textContent = '添加区块链';
+            document.getElementById('modalBody').innerHTML = chainFormHtml(null);
+            const mc = document.querySelector('#modal .modal-content');
+            if (mc) mc.classList.add('modal-lg');
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function showEditChain(chain) {
+            const info = chainsCache[chain] || {};
+            document.getElementById('modalTitle').textContent = '编辑链配置 — ' + (info.name || chain);
+            document.getElementById('modalBody').innerHTML = chainFormHtml(chain, info);
+            const mc = document.querySelector('#modal .modal-content');
+            if (mc) mc.classList.add('modal-lg');
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function chainFormHtml(chain, info) {
+            info = info || {};
+            const isEdit = !!chain;
+            const backups = Array.isArray(info.rpc_backups) ? info.rpc_backups.join('\n') : '';
+            return `
+                ${isEdit ? `<input type="hidden" id="chainId" value="${chain}">` : `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>链标识 *</label>
+                        <input type="text" id="chainKey" placeholder="如 linea、scroll（小写字母/数字/下划线）">
+                        <small>唯一标识，创建后不可修改</small>
+                    </div>
+                    <div class="form-group">
+                        <label>链类型 *</label>
+                        <select id="chainType">
+                            <option value="evm" selected>EVM 兼容（推荐）</option>
+                            <option value="trc20">TRC20 (Tron 代币)</option>
+                            <option value="trx">TRX (Tron 原生)</option>
+                        </select>
+                    </div>
+                </div>`}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>展示名称</label>
+                        <input type="text" id="chainName" value="${(info.name || '').replace(/"/g, '&quot;')}" placeholder="如 Linea USDT">
+                    </div>
+                    <div class="form-group">
+                        <label>确认区块数</label>
+                        <input type="number" id="chainConfirmations" value="${info.confirmations || 12}" min="1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>主 RPC 地址 *</label>
+                    <input type="text" id="chainRpc" value="${(info.rpc || '').replace(/"/g, '&quot;')}" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>备用 RPC（每行一个）</label>
+                    <textarea id="chainRpcBackups" rows="3" style="width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;">${backups}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>合约地址 ${isEdit && chain === 'trx' ? '（TRX 原生可留空）' : ''}</label>
+                    <input type="text" id="chainContract" value="${(info.contract_address || info.contract || '').replace(/"/g, '&quot;')}" placeholder="0x... 或 TR...">
+                </div>
+                <div class="form-row-3" style="margin-bottom:12px;">
+                    <div class="form-group">
+                        <label>扫描间隔(秒)</label>
+                        <input type="number" id="chainScanInterval" value="${info.scan_interval || info.interval || 30}" min="5">
+                    </div>
+                    <div class="form-group">
+                        <label>最大区块范围</label>
+                        <input type="number" id="chainMaxBlockRange" value="${info.max_block_range || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>批量大小</label>
+                        <input type="number" id="chainMaxBatchSize" value="${info.max_batch_size || 0}" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>批次延迟(ms)</label>
+                        <input type="number" id="chainBatchDelay" value="${info.batch_delay_ms || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>限流(次/秒)</label>
+                        <input type="number" id="chainRateLimit" value="${info.rate_limit || 0}" min="0" step="0.1">
+                    </div>
+                </div>
+                <div class="btn-group" style="margin-top:8px;">
+                    <button class="btn btn-primary" onclick="saveChainConfig(${isEdit ? 'true' : 'false'})">${isEdit ? '保存配置' : '添加链'}</button>
+                    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+                </div>
+            `;
+        }
+
+        async function saveChainConfig(isEdit) {
+            const backupsRaw = (document.getElementById('chainRpcBackups').value || '').trim();
+            const rpcBackups = backupsRaw ? backupsRaw.split(/\n+/).map(s => s.trim()).filter(Boolean) : [];
+            const payload = {
+                name: document.getElementById('chainName').value.trim(),
+                rpc: document.getElementById('chainRpc').value.trim(),
+                rpc_backups: rpcBackups,
+                contract_address: document.getElementById('chainContract').value.trim(),
+                confirmations: parseInt(document.getElementById('chainConfirmations').value) || 12,
+                scan_interval: parseInt(document.getElementById('chainScanInterval').value) || 30,
+                max_block_range: parseInt(document.getElementById('chainMaxBlockRange').value) || 0,
+                max_batch_size: parseInt(document.getElementById('chainMaxBatchSize').value) || 0,
+                batch_delay_ms: parseInt(document.getElementById('chainBatchDelay').value) || 0,
+                rate_limit: parseFloat(document.getElementById('chainRateLimit').value) || 0
+            };
+            let data;
+            if (isEdit) {
+                const chain = document.getElementById('chainId').value;
+                data = await api('/admin/api/chains/' + chain, { method: 'PUT', body: JSON.stringify(payload) });
+            } else {
+                payload.chain = (document.getElementById('chainKey').value || '').trim().toLowerCase();
+                payload.chain_type = document.getElementById('chainType').value;
+                data = await api('/admin/api/chains', { method: 'POST', body: JSON.stringify(payload) });
+            }
+            if (data.code === 1) {
+                closeModal();
+                loadChains();
+            } else {
+                alert(data.msg || '保存失败');
+            }
+        }
+
+        async function deleteChain(chain) {
+            if (!confirm('确定删除自定义链 ' + chain + '？此操作不可恢复。')) return;
+            const data = await api('/admin/api/chains/' + chain, { method: 'DELETE' });
+            if (data.code === 1) {
+                loadChains();
+            } else {
+                alert(data.msg || '删除失败');
             }
         }
 

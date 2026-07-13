@@ -217,3 +217,125 @@ func DecryptWechatNotify(associatedData, nonce, ciphertext string) (*WechatNotif
 	}
 	return &res, nil
 }
+
+// WechatConfigComplete 官方微信参数是否齐全
+func WechatConfigComplete() bool {
+	return GetConfig(CfgWechatAppID, "") != "" &&
+		GetConfig(CfgWechatMchID, "") != "" &&
+		GetConfig(CfgWechatSerialNo, "") != "" &&
+		GetConfig(CfgWechatPrivateKey, "") != "" &&
+		GetConfig(CfgWechatAPIv3Key, "") != ""
+}
+
+// WechatTestResult 配置探测结果
+type WechatTestResult struct {
+	AuthOK  bool
+	Code    string
+	Message string
+	Gateway string
+	HTTP    int
+}
+
+// TestWechatCredentials 通过查询一笔不存在的订单探测商户 API 证书鉴权是否有效
+// GET /v3/pay/transactions/out-trade-no/{out_trade_no}?mchid=xxx
+// 鉴权成功通常返回 404 RESOURCE_NOT_EXISTS；签名/证书错误返回 401
+func TestWechatCredentials() (*WechatTestResult, error) {
+	appID := GetConfig(CfgWechatAppID, "")
+	mchID := GetConfig(CfgWechatMchID, "")
+	serial := GetConfig(CfgWechatSerialNo, "")
+	privRaw := GetConfig(CfgWechatPrivateKey, "")
+	apiV3Key := GetConfig(CfgWechatAPIv3Key, "")
+
+	if appID == "" || mchID == "" || serial == "" || privRaw == "" {
+		return nil, fmt.Errorf("AppID / 商户号 / 证书序列号 / API私钥 未配齐")
+	}
+	if len(apiV3Key) != 32 {
+		return nil, fmt.Errorf("APIv3 密钥必须为 32 位字符（当前 %d）", len(apiV3Key))
+	}
+
+	priv, err := ParseRSAPrivateKey(privRaw)
+	if err != nil {
+		return nil, fmt.Errorf("私钥解析失败: %w", err)
+	}
+
+	probeNo := "k2pay_probe_" + time.Now().Format("20060102150405")
+	// canonical URL 不含 host，含 query
+	path := "/v3/pay/transactions/out-trade-no/" + probeNo + "?mchid=" + mchID
+	urlStr := "https://api.mch.weixin.qq.com" + path
+
+	auth, err := wechatAuthorization("GET", path, "", mchID, serial, priv)
+	if err != nil {
+		return nil, fmt.Errorf("构造签名失败: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Authorization", auth)
+	httpReq.Header.Set("User-Agent", "K2Pay/1.0")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("请求微信网关失败: %w", err)
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, err
+	}
+
+	out := &WechatTestResult{
+		HTTP:    resp.StatusCode,
+		Gateway: "https://api.mch.weixin.qq.com",
+	}
+
+	var apiErr struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	_ = json.Unmarshal(respBody, &apiErr)
+	out.Code = apiErr.Code
+
+	switch {
+	case resp.StatusCode == http.StatusOK:
+		// 探测单不可能存在；若 200 也视为鉴权通过
+		out.AuthOK = true
+		out.Message = "接口调用成功，配置有效"
+	case resp.StatusCode == http.StatusNotFound || apiErr.Code == "ORDER_NOT_EXIST" || apiErr.Code == "RESOURCE_NOT_EXISTS":
+		out.AuthOK = true
+		msg := apiErr.Message
+		if msg == "" {
+			msg = "订单不存在（探测单，属预期）"
+		}
+		out.Message = "鉴权通过: " + msg
+	case resp.StatusCode == http.StatusUnauthorized ||
+		strings.Contains(strings.ToUpper(apiErr.Code), "SIGN") ||
+		apiErr.Code == "AUTH_ERROR" ||
+		(apiErr.Code == "ERROR" && strings.Contains(strings.ToLower(apiErr.Message), "sign")):
+		out.AuthOK = false
+		out.Message = fmt.Sprintf("签名/证书鉴权失败 [%s]: %s", apiErr.Code, apiErr.Message)
+	case resp.StatusCode == http.StatusForbidden:
+		out.AuthOK = false
+		out.Message = fmt.Sprintf("权限不足 [%s]: %s", apiErr.Code, apiErr.Message)
+	default:
+		// 4xx 业务错误多数说明已通过签名校验
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 && apiErr.Code != "" &&
+			!strings.Contains(strings.ToUpper(apiErr.Code), "SIGN") &&
+			apiErr.Code != "AUTH_ERROR" {
+			out.AuthOK = true
+			out.Message = fmt.Sprintf("已收到业务响应 HTTP %d [%s]: %s", resp.StatusCode, apiErr.Code, apiErr.Message)
+		} else if resp.StatusCode >= 500 {
+			out.AuthOK = false
+			out.Message = fmt.Sprintf("微信服务异常 HTTP %d: %s", resp.StatusCode, string(respBody))
+		} else {
+			out.AuthOK = false
+			out.Message = fmt.Sprintf("HTTP %d: %s", resp.StatusCode, truncateRunes(string(respBody), 200))
+		}
+	}
+	return out, nil
+}

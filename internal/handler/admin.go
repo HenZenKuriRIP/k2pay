@@ -443,9 +443,13 @@ func (h *AdminHandler) CleanInvalidOrders(c *gin.Context) {
 }
 
 // ListMerchants 商户列表
+// 排除系统内部商户 (id=0 / p_id=SYSTEM)，该记录仅用于 wallets 外键，不应出现在商户管理与归属下拉中
 func (h *AdminHandler) ListMerchants(c *gin.Context) {
 	var merchants []model.Merchant
-	model.GetDB().Order("id DESC").Find(&merchants)
+	model.GetDB().
+		Where("id > 0 AND p_id != ?", "SYSTEM").
+		Order("id DESC").
+		Find(&merchants)
 
 	c.JSON(http.StatusOK, gin.H{"code": 1, "data": merchants})
 }
@@ -684,12 +688,13 @@ func (h *AdminHandler) ListWallets(c *gin.Context) {
 		result[i] = WalletResponse{
 			Wallet: w,
 		}
-		if w.Merchant != nil {
-			result[i].MerchantPID = w.Merchant.PID
-			result[i].MerchantName = w.Merchant.Name
-		} else if w.MerchantID == 0 {
+		// merchant_id=0 为全局系统钱包（非真实商户）
+		if w.MerchantID == 0 {
 			result[i].MerchantPID = "系统"
 			result[i].MerchantName = "系统钱包"
+		} else if w.Merchant != nil {
+			result[i].MerchantPID = w.Merchant.PID
+			result[i].MerchantName = w.Merchant.Name
 		}
 	}
 
@@ -1310,6 +1315,78 @@ func (h *AdminHandler) BatchUpdateChains(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "链状态更新成功"})
+}
+
+// UpdateChainConfig 更新链配置（RPC、扫描参数等）
+func (h *AdminHandler) UpdateChainConfig(c *gin.Context) {
+	chain := c.Param("chain")
+	if chain == "" {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "链名不能为空"})
+		return
+	}
+
+	var req service.ChainUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "参数错误"})
+		return
+	}
+
+	if err := service.GetBlockchainService().UpdateChainConfig(chain, req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "链配置已更新"})
+}
+
+// CreateChain 添加新链
+func (h *AdminHandler) CreateChain(c *gin.Context) {
+	var req service.ChainUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "参数错误"})
+		return
+	}
+
+	if err := service.GetBlockchainService().AddChain(req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "链已添加"})
+}
+
+// DeleteChain 删除自定义链
+func (h *AdminHandler) DeleteChain(c *gin.Context) {
+	chain := c.Param("chain")
+	if chain == "" {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "链名不能为空"})
+		return
+	}
+
+	if err := service.GetBlockchainService().DeleteChain(chain); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "链已删除"})
+}
+
+// CheckChainHealth 检查单条链健康度
+func (h *AdminHandler) CheckChainHealth(c *gin.Context) {
+	chain := c.Param("chain")
+	if chain == "" {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "链名不能为空"})
+		return
+	}
+
+	result := service.GetBlockchainService().CheckChainHealth(chain)
+	c.JSON(http.StatusOK, gin.H{"code": 1, "data": result})
+}
+
+// CheckAllChainsHealth 检查全部链健康度
+func (h *AdminHandler) CheckAllChainsHealth(c *gin.Context) {
+	result := service.GetBlockchainService().CheckAllChainsHealth()
+	c.JSON(http.StatusOK, gin.H{"code": 1, "data": result})
 }
 
 // ExportOrders 导出订单为CSV

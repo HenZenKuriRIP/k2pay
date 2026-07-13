@@ -120,6 +120,10 @@ func initServices(cfg *config.Config) {
 	// 初始化区块链服务（使用配置的钱包缓存TTL）
 	service.GetBlockchainService().Init(cfg)
 	service.GetBlockchainService().SetWalletCacheTTL(cfg.Order.WalletCacheTTL)
+	// 动态链（管理端新增）纳入 IsValidChain 校验
+	util.SetDynamicChainValidator(func(chain string) bool {
+		return service.GetBlockchainService().IsValidChainDynamic(chain)
+	})
 
 	// 初始化汇率服务
 	rateService := service.GetRateService()
@@ -237,6 +241,8 @@ func registerRoutes(r *gin.Engine, cfg *config.Config) {
 		// 官方支付宝/微信支付配置
 		adminAPI.GET("/official-pay", officialPayHandler.GetOfficialPayConfig)
 		adminAPI.POST("/official-pay", officialPayHandler.UpdateOfficialPayConfig)
+		adminAPI.POST("/official-pay/test-alipay", officialPayHandler.TestAlipayConfig)
+		adminAPI.POST("/official-pay/test-wechat", officialPayHandler.TestWechatConfig)
 
 		// 汇率
 		adminAPI.GET("/rate", adminHandler.GetRate)
@@ -289,9 +295,14 @@ func registerRoutes(r *gin.Engine, cfg *config.Config) {
 
 		// 链监控管理
 		adminAPI.GET("/chains", adminHandler.GetChainStatus)
+		adminAPI.POST("/chains", adminHandler.CreateChain)
+		adminAPI.PUT("/chains/:chain", adminHandler.UpdateChainConfig)
+		adminAPI.DELETE("/chains/:chain", adminHandler.DeleteChain)
 		adminAPI.POST("/chains/:chain/enable", adminHandler.EnableChain)
 		adminAPI.POST("/chains/:chain/disable", adminHandler.DisableChain)
 		adminAPI.POST("/chains/batch", adminHandler.BatchUpdateChains)
+		adminAPI.GET("/chains/health", adminHandler.CheckAllChainsHealth)
+		adminAPI.GET("/chains/:chain/health", adminHandler.CheckChainHealth)
 
 		// 提现管理
 		adminAPI.GET("/withdrawals", adminHandler.ListWithdrawals)
