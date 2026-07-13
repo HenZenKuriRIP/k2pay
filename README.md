@@ -15,23 +15,43 @@
 ## 快速安装（Linux 服务器）
 
 ```bash
-# 一键安装（自动依赖、数据库、二进制、systemd；可选 Nginx + Let's Encrypt）
+# 一键安装：依赖 + MySQL + 二进制 + systemd + 干净 Nginx 反代 + HTTPS
 curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | \
   sudo bash -s -- --domain pay.example.com --email admin@example.com
 ```
 
+安装脚本会：
+
+1. 安装/启动 MySQL（MariaDB）与 Nginx  
+2. 下载 Release 二进制（无则源码编译）  
+3. **清理冲突的 Nginx 站点**（禁用 `default`、删除旧 k2pay 配置；**不删** `/etc/letsencrypt`）  
+4. 写入干净的 `k2pay` 站点配置：`proxy_pass` → `127.0.0.1:6088`  
+5. **若证书已存在** → 直接挂载 HTTPS；否则用 `certbot certonly --webroot` 申请后再写 HTTPS（**不用** `certbot --nginx`，避免改坏 default）  
+6. 配置 systemd 并启动  
+
 | 参数 | 说明 |
 |------|------|
-| `--domain` | 域名（配置 Nginx） |
-| `--email` | 申请证书邮箱 |
-| `--skip-cert` | 不申请 HTTPS |
-| `--skip-nginx` | 仅装服务，不装 Nginx |
-| `--version v1.0.0` | 指定 Release 版本 |
+| `--domain` | 域名（强烈建议） |
+| `--email` | 申请证书邮箱（已有证书可省略） |
+| `--reinstall` | 重装：覆盖二进制并重写 Nginx |
+| `--reset-nginx` | 清理冲突站点（**默认开启**） |
+| `--keep-nginx` | 不清理其它站点，仅写 k2pay 配置 |
+| `--skip-cert` | 仅 HTTP 反代 |
+| `--skip-nginx` | 不装 Nginx |
+| `--version v1.0.0` | 指定 Release |
+
+重装（例如证书已有、只修 Nginx）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh | \
+  sudo bash -s -- --domain pay.example.com --reinstall
+```
 
 卸载（**保留数据库与域名证书**）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh | sudo bash
+# 跳过确认: ... | sudo bash -s -- --force
 ```
 
 | 入口 | 地址 |
