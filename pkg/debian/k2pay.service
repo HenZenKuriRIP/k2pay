@@ -1,0 +1,27 @@
+[Unit]
+Description=K2Pay Payment Gateway
+Documentation=https://github.com/HenZenKuriRIP/k2pay
+After=network.target mysql.service mariadb.service
+
+[Service]
+Type=simple
+User=k2pay
+Group=k2pay
+WorkingDirectory=/usr/share/k2pay
+ExecStart=/usr/bin/k2pay
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/k2pay /var/log/k2pay
+
+# Environment
+Environment=GIN_MODE=release
+Environment=EZPAY_DATA_DIR=/var/lib/k2pay
+
+[Install]
+WantedBy=multi-user.target

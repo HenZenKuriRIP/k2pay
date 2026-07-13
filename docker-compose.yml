@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  k2pay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: k2pay:latest
+    container_name: k2pay
+    restart: unless-stopped
+    ports:
+      - "6088:6088"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - k2pay_data:/var/lib/k2pay
+    environment:
+      - TZ=Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - k2pay-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mysql:
+    image: mysql:8.0
+    container_name: k2pay-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # Uncomment for database migrations (upgrading existing database)
+      # - ./db/migrate_usd_settlement.sql:/docker-entrypoint-initdb.d/02-migrate.sql:ro
+    environment:
+      - MYSQL_ROOT_PASSWORD=root123456
+      - MYSQL_DATABASE=k2pay
+      - MYSQL_USER=k2pay
+      - MYSQL_PASSWORD=k2pay123456
+      - TZ=Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    networks:
+      - k2pay-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  k2pay_data:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  k2pay-net:
+    driver: bridge

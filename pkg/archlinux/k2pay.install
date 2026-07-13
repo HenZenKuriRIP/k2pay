@@ -1,0 +1,59 @@
+post_install() {
+    # Create k2pay user and group
+    if ! getent group k2pay >/dev/null; then
+        groupadd -r k2pay
+    fi
+    if ! getent passwd k2pay >/dev/null; then
+        useradd -r -g k2pay -d /var/lib/k2pay -s /usr/bin/nologin -c "K2Pay Payment Gateway" k2pay
+    fi
+
+    # Create data directories
+    mkdir -p /var/lib/k2pay/uploads
+    mkdir -p /var/lib/k2pay/qrcode
+
+    # Set ownership
+    chown -R k2pay:k2pay /var/lib/k2pay
+    chown -R k2pay:k2pay /var/log/k2pay
+    chown -R k2pay:k2pay /usr/share/k2pay
+
+    # Set config permissions
+    chown k2pay:k2pay /etc/k2pay/config.yaml
+    chmod 600 /etc/k2pay/config.yaml
+
+    echo "==> K2Pay installed successfully!"
+    echo "==> "
+    echo "==> Next steps:"
+    echo "==>   1. Edit config:    /etc/k2pay/config.yaml"
+    echo "==>   2. Init database:  /usr/share/k2pay/db/migrate.sh migrate"
+    echo "==>   3. Start service:  systemctl start k2pay"
+    echo "==>   4. Enable on boot: systemctl enable k2pay"
+    echo "==> "
+    echo "==> Database scripts location: /usr/share/k2pay/db/"
+}
+
+post_upgrade() {
+    # Set ownership for new files
+    chown -R k2pay:k2pay /usr/share/k2pay
+
+    echo "==> K2Pay upgraded successfully!"
+    echo "==> "
+    echo "==> Next steps:"
+    echo "==>   1. Apply migrations: /usr/share/k2pay/db/migrate.sh migrate"
+    echo "==>   2. Restart service:  systemctl restart k2pay"
+}
+
+pre_remove() {
+    # Stop service before removal
+    if systemctl is-active --quiet k2pay; then
+        systemctl stop k2pay
+    fi
+    if systemctl is-enabled --quiet k2pay; then
+        systemctl disable k2pay
+    fi
+}
+
+post_remove() {
+    echo "==> K2Pay removed."
+    echo "==> User 'k2pay' and data in /var/lib/k2pay were preserved."
+    echo "==> To remove completely: userdel -r k2pay"
+}

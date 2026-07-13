@@ -1,0 +1,24 @@
+# binaries
+k2pay
+k2pay.exe
+ezpay
+*.exe
+/tmp/
+/release/
+/release-artifacts/
+*.tar.gz
+*.deb
+*.zip
+
+# config secrets (keep example)
+config.local.yaml
+*.credentials
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# go
+/vendor/
