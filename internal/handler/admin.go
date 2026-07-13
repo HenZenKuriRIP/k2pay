@@ -217,11 +217,12 @@ func (h *AdminHandler) DashboardTop(c *gin.Context) {
 		Name       string  `json:"name"`
 		AmountUSD  float64 `json:"amount_usd"`
 	}
+	// PostgreSQL: SELECT 中的非聚合列必须全部出现在 GROUP BY
 	model.GetDB().Model(&model.Order{}).
 		Select("orders.merchant_id, merchants.p_id as pid, merchants.name, COALESCE(SUM(orders.settlement_amount), 0) as amount_usd").
 		Joins("LEFT JOIN merchants ON merchants.id = orders.merchant_id").
 		Where("orders.status = 1").
-		Group("orders.merchant_id").
+		Group("orders.merchant_id, merchants.p_id, merchants.name").
 		Order("amount_usd DESC").
 		Limit(5).
 		Scan(&topAmount)
@@ -237,7 +238,7 @@ func (h *AdminHandler) DashboardTop(c *gin.Context) {
 		Select("orders.merchant_id, merchants.p_id as pid, merchants.name, COUNT(*) as count").
 		Joins("LEFT JOIN merchants ON merchants.id = orders.merchant_id").
 		Where("orders.status = 1").
-		Group("orders.merchant_id").
+		Group("orders.merchant_id, merchants.p_id, merchants.name").
 		Order("count DESC").
 		Limit(5).
 		Scan(&topCount)
