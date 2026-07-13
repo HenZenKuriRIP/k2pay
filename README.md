@@ -10,7 +10,7 @@
 - 支付：`/api/pay/*` 下单 / 查单 / 退款（余额冲正）
 - 通道：链上 USDT/TRX、个人收款码、支付宝/微信官方 Native 扫码
 - 回调：异步 `notify_url`（MD5 签名 + 重试）、同步 `return_url`
-- 运维：Docker、systemd、一键安装（Nginx + 证书 + MySQL）
+- 运维：systemd、一键安装（Nginx + 证书 + MySQL）
 
 ## 快速安装（Linux 服务器）
 
@@ -319,11 +319,6 @@ k2pay/
 - 官方支付：管理后台填写 `site_url` 与支付宝/微信密钥
 - 法币默认个人码；改为「官方」后走开放平台扫码
 
-## Docker
-
-```bash
-docker compose up -d
-```
 
 ## License
 
