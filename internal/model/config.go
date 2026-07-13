@@ -45,7 +45,7 @@ const (
 type BlockScanProgress struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Chain     string    `gorm:"type:varchar(20);uniqueIndex;not null" json:"chain"`
-	LastBlock uint64    `gorm:"type:bigint unsigned;not null;default:0" json:"last_block"`
+	LastBlock uint64    `gorm:"type:bigint;not null;default:0" json:"last_block"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
