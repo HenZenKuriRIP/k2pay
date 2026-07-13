@@ -17,20 +17,26 @@
 ## 快速安装（Linux 服务器）
 
 ```bash
-# 安装 / 重装
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
+# 安装 / 重装（已是 root 时直接用，不要再套一层 sudo）
+bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
 
 # 指定域名
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh) --domain pay.example.com
+bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh) --domain pay.example.com
 
 # 卸载
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh)
-sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh) -y
+bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh) -y
 ```
 
-> 用 `sudo bash <(curl …)`，不要用 `curl | sudo bash`（管道会占掉 stdin，确认提示会直接取消）。
+普通用户可先下载再 sudo：
 
-可选参数：`--domain` / `--email`（默认 `admin@k2pay.com`）/ `--version` / `--skip-https` / `--no-nginx`；卸载加 `--purge-all` 可清库。
+```bash
+curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh -o /tmp/k2pay-i.sh
+sudo bash /tmp/k2pay-i.sh
+```
+
+> 不要用 `curl | bash`（占 stdin）；已是 `root@` 时不要再写 `sudo bash <(...)`（部分环境 process substitution 会失败）。
+
+可选：`--domain` / `--email`（默认 `admin@k2pay.com`）/ `--version` / `--skip-https` / `--no-nginx`；卸载 `--purge-all` 清库。
 
 | 入口 | 地址 |
 |------|------|

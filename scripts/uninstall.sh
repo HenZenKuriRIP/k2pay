@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # K2Pay 卸载
-#   sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh)
-#   sudo bash <(curl -fsSL .../uninstall.sh) -y
+#   root: bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh)
+#   普通用户: curl ... -o /tmp/k2pay-u.sh && sudo bash /tmp/k2pay-u.sh -y
 set -euo pipefail
 
 FORCE=0
@@ -33,16 +33,18 @@ while [[ $# -gt 0 ]]; do
       cat <<EOF
 卸载 K2Pay
 
-  sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh)
-  sudo bash <(curl -fsSL .../uninstall.sh) -y
-  sudo bash <(curl -fsSL .../uninstall.sh) -y --purge-all
+  bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh)
+  bash <(curl -fsSL .../uninstall.sh) -y
+  bash <(curl -fsSL .../uninstall.sh) -y --purge-all
 EOF
       exit 0 ;;
     *) die "未知参数: $1" ;;
   esac
 done
 
-[[ "$(id -u)" -eq 0 ]] || die "请加 sudo 运行"
+if [[ "$(id -u)" -ne 0 ]]; then
+  die "请用 root 执行，或: curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/uninstall.sh -o /tmp/k2pay-u.sh && sudo bash /tmp/k2pay-u.sh"
+fi
 
 echo -e "${C1}K2Pay 卸载${C0}"
 echo "  移除: 程序 / 服务 / Nginx 站点"

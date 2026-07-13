@@ -144,7 +144,7 @@ func (h *RateHandler) RefreshAutoRates(c *gin.Context) {
 	var rates []model.ExchangeRate
 
 	// 查询启用自动更新的汇率
-	if err := model.GetDB().Where("auto_update = 1 AND rate_type = 'auto'").Find(&rates).Error; err != nil {
+	if err := model.GetDB().Where("auto_update = ? AND rate_type = ?", true, "auto").Find(&rates).Error; err != nil {
 		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "查询失败: " + err.Error()})
 		return
 	}

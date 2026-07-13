@@ -62,7 +62,8 @@ func (u *RateUpdater) updateRates() {
 	var rates []model.ExchangeRate
 
 	// 查询启用自动更新的汇率
-	if err := model.GetDB().Where("auto_update = 1 AND rate_type = 'auto'").Find(&rates).Error; err != nil {
+	// PostgreSQL: boolean 用 true/false，不能用 1/0
+	if err := model.GetDB().Where("auto_update = ? AND rate_type = ?", true, "auto").Find(&rates).Error; err != nil {
 		log.Printf("查询自动更新汇率失败: %v", err)
 		return
 	}

@@ -37,7 +37,15 @@ func InitDB(dsn string) error {
 func InitDBWithConfig(dsn string, cfg DBConfig) error {
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logger.Warn),
+		Logger: logger.New(
+			log.New(log.Writer(), "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true, // 首次扫链无进度时不刷 ERROR
+				Colorful:                  false,
+			},
+		),
 		DisableForeignKeyConstraintWhenMigrating: false,
 	})
 	if err != nil {

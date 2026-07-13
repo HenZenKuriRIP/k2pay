@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # K2Pay 安装 / 重装
-#   sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
-#   sudo bash <(curl -fsSL .../install.sh) --domain pay.example.com
+#   root 用户:
+#     bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
+#   普通用户:
+#     curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh -o /tmp/k2pay-i.sh
+#     sudo bash /tmp/k2pay-i.sh
 set -euo pipefail
 
 REPO="HenZenKuriRIP/k2pay"
@@ -44,8 +47,12 @@ usage() {
   cat <<EOF
 K2Pay 安装
 
-  sudo bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
-  sudo bash <(curl -fsSL .../install.sh) --domain pay.example.com
+  # root
+  bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh)
+
+  # 普通用户
+  curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh -o /tmp/k2pay-i.sh
+  sudo bash /tmp/k2pay-i.sh --domain pay.example.com
 
 选项:
   --domain FQDN     域名（不传则询问）
@@ -68,7 +75,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ "$(id -u)" -eq 0 ]] || die "请加 sudo: sudo bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh)"
+if [[ "$(id -u)" -ne 0 ]]; then
+  die "请用 root 执行，或: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install.sh -o /tmp/k2pay-i.sh && sudo bash /tmp/k2pay-i.sh"
+fi
 [[ "$(uname -s)" == "Linux" ]] || die "仅支持 Linux"
 
 ARCH="$(uname -m)"
@@ -223,7 +232,8 @@ fetch_bin() {
   do
     if curl -fsSL "$u" -o "$TMPDIR/dl" 2>/dev/null; then
       if file "$TMPDIR/dl" 2>/dev/null | grep -qiE 'gzip|tar'; then
-        tar -xzf "$TMPDIR/dl" -C "$TMPDIR"
+        # macOS 打的包可能带 xattr 警告，忽略即可
+        tar -xzf "$TMPDIR/dl" -C "$TMPDIR" 2>/dev/null || tar -xzf "$TMPDIR/dl" -C "$TMPDIR"
         f="$(find "$TMPDIR" -type f -name 'k2pay*' ! -name '*.tar.gz' ! -name '*.tgz' | head -1)"
         [[ -n "$f" ]] && cp "$f" "$TMPDIR/k2pay" && return 0
       else
@@ -516,5 +526,5 @@ else
 fi
 echo "  默认账号:  admin / admin123  ← 请立即修改"
 echo
-echo "  卸载: sudo bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh)"
+echo "  卸载: bash <(curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh)"
 echo

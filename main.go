@@ -135,6 +135,11 @@ func registerRoutes(r *gin.Engine, cfg *config.Config) {
 	// CORS（使用配置的域名白名单）
 	r.Use(middleware.CORSWithConfig(cfg.Security.CORSAllowOrigins))
 
+	// 根路径跳转管理后台
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/admin")
+	})
+
 	// 创建处理器
 	epayHandler := handler.NewEpayHandler()
 	adminHandler := handler.NewAdminHandler(cfg)
