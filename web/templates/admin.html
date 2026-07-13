@@ -264,6 +264,20 @@
             .main-content { margin-left: 0; padding: 16px; }
         }
 
+        /* 有本地 token 时先隐藏登录页，避免刷新闪一下登录再进后台 */
+        html.auth-checking #loginContainer { display: none !important; }
+        html.auth-checking #authBoot { display: flex !important; }
+        #authBoot {
+            display: none; min-height: 100vh; align-items: center; justify-content: center;
+            background: linear-gradient(160deg, #eef4ff 0%, #f4f7fb 45%, #e8f7f2 100%);
+            color: var(--text-2); font-size: 14px; flex-direction: column; gap: 12px;
+        }
+        #authBoot .spin {
+            width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top-color: var(--primary);
+            border-radius: 50%; animation: authSpin .7s linear infinite;
+        }
+        @keyframes authSpin { to { transform: rotate(360deg); } }
+
         /* Server metrics */
         .metric-bar {
             height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-top: 10px;
@@ -278,8 +292,22 @@
         }
         .m-meta-label { font-size: 11px; color: var(--text-3); font-weight: 550; text-transform: uppercase; letter-spacing: .04em; }
     </style>
+    <script>
+        // 尽早判断：有 token 则进入校验态，防止先闪登录页
+        try {
+            if (localStorage.getItem('admin_token')) {
+                document.documentElement.classList.add('auth-checking');
+            }
+        } catch (e) {}
+    </script>
 </head>
 <body>
+    <!-- 会话校验中 -->
+    <div id="authBoot">
+        <div class="spin"></div>
+        <div>正在验证登录状态…</div>
+    </div>
+
     <!-- Login -->
     <div class="login-container" id="loginContainer">
         <div class="login-box">
@@ -1121,10 +1149,29 @@
 
     <script>
         let token = localStorage.getItem('admin_token');
+        let menuBound = false;
+        let authReady = !token; // 无 token 时无需等待校验
 
-        // 启动：有本地 token 必须先向服务端校验（避免重装后脏 token「假登录」）
+        function endAuthBoot() {
+            document.documentElement.classList.remove('auth-checking');
+            const boot = document.getElementById('authBoot');
+            if (boot) boot.style.display = 'none';
+            authReady = true;
+        }
+
+        function showLoginView() {
+            endAuthBoot();
+            document.getElementById('appContainer').style.display = 'none';
+            document.getElementById('forcePasswordContainer').style.display = 'none';
+            document.getElementById('loginContainer').style.display = 'flex';
+        }
+
+        // 启动：有本地 token 时先不展示登录页，校验通过再进后台
         (async function bootstrapAuth() {
-            if (!token) return;
+            if (!token) {
+                showLoginView();
+                return;
+            }
             try {
                 const res = await fetch('/admin/api/dashboard', {
                     headers: { 'Authorization': 'Bearer ' + token }
@@ -1132,7 +1179,7 @@
                 let data = {};
                 try { data = await res.json(); } catch (_) {}
 
-                if (res.status === 401 || data.msg === '未登录' || data.msg === 'Token无效或已过期') {
+                if (res.status === 401 || data.msg === '未登录' || data.msg === 'Token无效或已过期' || data.msg === 'Token格式错误') {
                     clearAuth(false);
                     return;
                 }
@@ -1141,14 +1188,18 @@
                     return;
                 }
                 if (data.code === 1) {
+                    showApp(data);
+                    return;
+                }
+                // 非鉴权失败（如 5xx）：保留 token，进入后台再由接口处理，避免误踢
+                if (res.status >= 500) {
                     showApp();
                     return;
                 }
-                // 其它异常：清 token 回登录，避免空壳后台
                 clearAuth(false);
             } catch (_) {
-                // 网络异常时不自动进后台
-                clearAuth(false);
+                // 网络异常：保留会话，直接进后台（避免误登出）；接口失败再处理
+                showApp();
             }
         })();
 
@@ -1183,10 +1234,8 @@
 
         function clearAuth(reload) {
             token = null;
-            localStorage.removeItem('admin_token');
-            document.getElementById('appContainer').style.display = 'none';
-            document.getElementById('forcePasswordContainer').style.display = 'none';
-            document.getElementById('loginContainer').style.display = 'flex';
+            try { localStorage.removeItem('admin_token'); } catch (e) {}
+            showLoginView();
             if (reload) location.reload();
         }
 
@@ -1195,6 +1244,7 @@
         }
 
         function showForcePassword() {
+            endAuthBoot();
             document.getElementById('loginContainer').style.display = 'none';
             document.getElementById('appContainer').style.display = 'none';
             document.getElementById('forcePasswordContainer').style.display = 'flex';
@@ -1242,37 +1292,50 @@
             }
         }
 
-        function showApp() {
+        function showApp(prefetchedDashboard) {
+            endAuthBoot();
             document.getElementById('loginContainer').style.display = 'none';
             document.getElementById('forcePasswordContainer').style.display = 'none';
             document.getElementById('appContainer').style.display = 'block';
-            loadDashboard();
 
-            // Menu navigation
-            document.querySelectorAll('.menu-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
-                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-                    this.classList.add('active');
-                    const page = this.dataset.page;
-                    document.getElementById('page-' + page).classList.add('active');
-                    document.getElementById('pageTitle').textContent = this.textContent;
+            if (prefetchedDashboard && prefetchedDashboard.code === 1) {
+                applyDashboardPayload(prefetchedDashboard);
+                loadTrendData(currentTrendPeriod || 'today');
+                loadTopMerchants();
+                loadSystemMetrics();
+            } else {
+                loadDashboard();
+            }
 
-                    if (page === 'dashboard') loadDashboard();
-                    if (page === 'orders') { loadOrderMerchantFilter(); loadOrders(); }
-                    if (page === 'merchants') loadMerchants();
-                    if (page === 'wallets') loadWallets();
-                    if (page === 'exchange-rates') loadExchangeRates();
-                    if (page === 'chains') loadChains();
-                    if (page === 'api-logs') loadAPILogs();
-                    if (page === 'ip-blacklist') loadIPBlacklist();
-                    if (page === 'withdrawals') loadWithdrawals();
-                    if (page === 'withdraw-addresses') loadWithdrawAddresses();
-                    if (page === 'app-versions') loadAppVersions();
-                    if (page === 'payment-methods') loadOfficialPay();
-                    if (page === 'settings') loadSettings();
+            // Menu navigation（只绑定一次）
+            if (!menuBound) {
+                menuBound = true;
+                document.querySelectorAll('.menu-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+                        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                        this.classList.add('active');
+                        const page = this.dataset.page;
+                        const pageEl = document.getElementById('page-' + page);
+                        if (pageEl) pageEl.classList.add('active');
+                        document.getElementById('pageTitle').textContent = this.textContent.trim();
+
+                        if (page === 'dashboard') loadDashboard();
+                        if (page === 'orders') { loadOrderMerchantFilter(); loadOrders(); }
+                        if (page === 'merchants') loadMerchants();
+                        if (page === 'wallets') loadWallets();
+                        if (page === 'exchange-rates') loadExchangeRates();
+                        if (page === 'chains') loadChains();
+                        if (page === 'api-logs') loadAPILogs();
+                        if (page === 'ip-blacklist') loadIPBlacklist();
+                        if (page === 'withdrawals') loadWithdrawals();
+                        if (page === 'withdraw-addresses') loadWithdrawAddresses();
+                        if (page === 'app-versions') loadAppVersions();
+                        if (page === 'payment-methods') loadOfficialPay();
+                        if (page === 'settings') loadSettings();
+                    });
                 });
-            });
+            }
         }
 
         function showToast(message, type = 'success') {
@@ -1323,59 +1386,54 @@
             }
         }
 
+        function applyDashboardPayload(data) {
+            if (!data || data.code !== 1 || !data.data) return;
+            document.getElementById('todayOrders').textContent = data.data.stats.today_orders || 0;
+            document.getElementById('todayUSD').textContent = parseFloat(data.data.stats.today_usd || 0).toFixed(2);
+            document.getElementById('pendingOrders').textContent = data.data.stats.pending_orders || 0;
+            document.getElementById('availableChannels').textContent = data.data.stats.available_channels || 0;
+
+            let statusHtml = '<table><tr><th>链</th><th>币种类型</th><th>类型</th><th>状态</th><th>账号数量</th><th>核算货币</th></tr>';
+            const chainNames = {
+                'trx': 'TRX (Tron)',
+                'trc20': 'TRC20 (Tron USDT)',
+                'erc20': 'ERC20 (Ethereum)',
+                'bsc': 'BEP20 (BSC)',
+                'bep20': 'BEP20 (BSC)',
+                'polygon': 'Polygon',
+                'optimism': 'Optimism',
+                'arbitrum': 'Arbitrum',
+                'avalanche': 'Avalanche',
+                'base': 'Base',
+                'wechat': 'WeChat Pay',
+                'alipay': 'Alipay'
+            };
+            const currencyTypes = {
+                'trx': 'TRX', 'trc20': 'USDT', 'erc20': 'USDT', 'bsc': 'USDT', 'bep20': 'USDT',
+                'polygon': 'USDT', 'optimism': 'USDT', 'arbitrum': 'USDT', 'avalanche': 'USDT',
+                'base': 'USDT', 'wechat': 'CNY', 'alipay': 'CNY'
+            };
+            for (const [chain, info] of Object.entries(data.data.blockchain || {})) {
+                const displayName = chainNames[chain] || chain.toUpperCase();
+                const currencyType = currencyTypes[chain] || 'USDT';
+                const typeLabel = info.passive ? '<span class="badge" style="background:#9c27b0;color:white;">被动推送</span>' : '<span class="badge" style="background:#2196f3;color:white;">主动监控</span>';
+                const statusLabel = info.running ? '<span class="badge badge-success">运行中</span>' : '<span class="badge badge-danger">已停止</span>';
+                const walletCount = info.wallet_count || 0;
+                statusHtml += `<tr><td>${displayName}</td><td><span class="badge" style="background:#607d8b;color:white;">${currencyType}</span></td><td>${typeLabel}</td><td>${statusLabel}</td><td>${walletCount}</td><td><span class="badge" style="background:#4caf50;color:white;">USD</span></td></tr>`;
+            }
+            statusHtml += '</table>';
+            document.getElementById('blockchainStatus').innerHTML = statusHtml;
+            if (data.data.system) {
+                renderSystemMetrics(data.data.system);
+            }
+        }
+
         async function loadDashboard() {
             const data = await api('/admin/api/dashboard');
             if (data.code === 1) {
-                document.getElementById('todayOrders').textContent = data.data.stats.today_orders || 0;
-                document.getElementById('todayUSD').textContent = parseFloat(data.data.stats.today_usd || 0).toFixed(2);
-                document.getElementById('pendingOrders').textContent = data.data.stats.pending_orders || 0;
-                document.getElementById('availableChannels').textContent = data.data.stats.available_channels || 0;
-
-                let statusHtml = '<table><tr><th>链</th><th>币种类型</th><th>类型</th><th>状态</th><th>账号数量</th><th>核算货币</th></tr>';
-                const chainNames = {
-                    'trx': 'TRX (Tron)',
-                    'trc20': 'TRC20 (Tron USDT)',
-                    'erc20': 'ERC20 (Ethereum)',
-                    'bsc': 'BEP20 (BSC)',
-                    'bep20': 'BEP20 (BSC)',
-                    'polygon': 'Polygon',
-                    'optimism': 'Optimism',
-                    'arbitrum': 'Arbitrum',
-                    'avalanche': 'Avalanche',
-                    'base': 'Base',
-                    'wechat': 'WeChat Pay',
-                    'alipay': 'Alipay'
-                };
-                const currencyTypes = {
-                    'trx': 'TRX',
-                    'trc20': 'USDT',
-                    'erc20': 'USDT',
-                    'bsc': 'USDT',
-                    'bep20': 'USDT',
-                    'polygon': 'USDT',
-                    'optimism': 'USDT',
-                    'arbitrum': 'USDT',
-                    'avalanche': 'USDT',
-                    'base': 'USDT',
-                    'wechat': 'CNY',
-                    'alipay': 'CNY'
-                };
-                for (const [chain, info] of Object.entries(data.data.blockchain)) {
-                    const displayName = chainNames[chain] || chain.toUpperCase();
-                    const currencyType = currencyTypes[chain] || 'USDT';
-                    const typeLabel = info.passive ? '<span class="badge" style="background:#9c27b0;color:white;">被动推送</span>' : '<span class="badge" style="background:#2196f3;color:white;">主动监控</span>';
-                    const statusLabel = info.running ? '<span class="badge badge-success">运行中</span>' : '<span class="badge badge-danger">已停止</span>';
-                    const walletCount = info.wallet_count || 0;
-                    statusHtml += `<tr><td>${displayName}</td><td><span class="badge" style="background:#607d8b;color:white;">${currencyType}</span></td><td>${typeLabel}</td><td>${statusLabel}</td><td>${walletCount}</td><td><span class="badge" style="background:#4caf50;color:white;">USD</span></td></tr>`;
-                }
-                statusHtml += '</table>';
-                document.getElementById('blockchainStatus').innerHTML = statusHtml;
-                if (data.data.system) {
-                    renderSystemMetrics(data.data.system);
-                }
+                applyDashboardPayload(data);
             }
-            // 加载趋势图和TOP数据
-            loadTrendData('today');
+            loadTrendData(currentTrendPeriod || 'today');
             loadTopMerchants();
             loadSystemMetrics();
         }
