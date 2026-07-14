@@ -61,6 +61,12 @@ type SecurityConfig struct {
 	IPBlacklistCacheTTL int `mapstructure:"ip_blacklist_cache_ttl"` // IP黑名单缓存时间(秒)
 	// HTTP超时
 	HTTPTimeout int `mapstructure:"http_timeout"` // 外部HTTP请求超时(秒)
+	// 反代 / Cloudflare：信任的上游网段，用于还原真实客户端 IP（白名单/黑名单/限流依赖）
+	// 本机 Nginx 反代时一般为 ["127.0.0.1", "::1"]
+	// Cloudflare 直连应用（少见）时可填 CF IP 段，或留空并依赖 Nginx real_ip
+	TrustedProxies []string `mapstructure:"trusted_proxies"`
+	// 是否信任 CF-Connecting-IP（仅当请求来自 TrustedProxies 时生效；配合 Nginx 透传该头）
+	TrustCloudflare bool `mapstructure:"trust_cloudflare"`
 }
 
 // NotifyConfig 通知配置
@@ -220,6 +226,9 @@ func setDefaults() {
 	viper.SetDefault("security.cors_allow_origins", []string{})
 	viper.SetDefault("security.ip_blacklist_cache_ttl", 30)
 	viper.SetDefault("security.http_timeout", 15)
+	// 默认信任本机 Nginx；生产经 Cloudflare 时请配合 Nginx real_ip，并设 trust_cloudflare: true
+	viper.SetDefault("security.trusted_proxies", []string{"127.0.0.1", "::1"})
+	viper.SetDefault("security.trust_cloudflare", false)
 
 	// Notify
 	viper.SetDefault("notify.retry_count", 5)
@@ -349,6 +358,12 @@ security:
   cors_allow_origins: []
   ip_blacklist_cache_ttl: 30
   http_timeout: 15
+  # 信任的反代地址（Gin ClientIP）。本机 Nginx: 127.0.0.1
+  trusted_proxies:
+    - "127.0.0.1"
+    - "::1"
+  # 支付域名经 Cloudflare 代理时设为 true（并配置 Nginx real_ip，见 README）
+  trust_cloudflare: false
 
 order:
   expire_minutes: 30

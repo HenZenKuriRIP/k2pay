@@ -60,6 +60,10 @@ func main() {
 
 	// 创建路由
 	r := gin.Default()
+	// 反代 / Cloudflare：还原真实客户端 IP（IP 白名单、黑名单、限流依赖）
+	if err := configureTrustedProxies(r, cfg); err != nil {
+		log.Fatalf("Failed to configure trusted proxies: %v", err)
+	}
 
 	// 加载模板和静态文件 (根据构建模式自动选择嵌入或文件系统)
 	funcMap := template.FuncMap{
@@ -226,6 +230,8 @@ func registerRoutes(r *gin.Engine, cfg *config.Config) {
 		adminAPI.GET("/merchants/:id/key", adminHandler.GetMerchantKey)
 		adminAPI.POST("/merchants/:id/reset-key", adminHandler.ResetMerchantKey)
 		adminAPI.POST("/merchants/:id/balance", adminHandler.AdjustMerchantBalance)
+		// 对接工具：域名 → IP（写入商户 IP 白名单）
+		adminAPI.POST("/tools/resolve-host", adminHandler.ResolveHost)
 
 		// 钱包管理
 		adminAPI.GET("/wallets", adminHandler.ListWallets)
@@ -542,4 +548,30 @@ func startBackgroundServices(cfg *config.Config) {
 	service.GetTelegramService().Start()
 
 	log.Println("Background services started")
+}
+
+// configureTrustedProxies 配置 Gin 信任的反代，用于 ClientIP() 还原真实客户端 IP。
+// 本地 Nginx 反代请信任 127.0.0.1；经 Cloudflare 时务必同时在 Nginx 配置 real_ip（见 README）。
+func configureTrustedProxies(r *gin.Engine, cfg *config.Config) error {
+	proxies := cfg.Security.TrustedProxies
+	if len(proxies) == 0 {
+		// 空列表：不信任任何 X-Forwarded-*（仅 RemoteAddr），适合直连调试
+		if err := r.SetTrustedProxies(nil); err != nil {
+			return err
+		}
+		log.Println("Trusted proxies: disabled (using RemoteAddr only)")
+		return nil
+	}
+	if err := r.SetTrustedProxies(proxies); err != nil {
+		return err
+	}
+	// 头优先级：Cloudflare 真实 IP → 标准反代头
+	if cfg.Security.TrustCloudflare {
+		r.RemoteIPHeaders = []string{"CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP"}
+		log.Printf("Trusted proxies: %v (Cloudflare CF-Connecting-IP enabled)", proxies)
+	} else {
+		r.RemoteIPHeaders = []string{"X-Forwarded-For", "X-Real-IP"}
+		log.Printf("Trusted proxies: %v", proxies)
+	}
+	return nil
 }

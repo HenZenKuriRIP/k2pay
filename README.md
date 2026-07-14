@@ -36,7 +36,7 @@ sudo bash /tmp/k2pay-i.sh
 
 > 不要用 `curl | bash`（占 stdin）；已是 `root@` 时不要再写 `sudo bash <(...)`（部分环境 process substitution 会失败）。
 
-可选：`--domain` / `--email`（默认 `admin@k2pay.com`）/ `--version` / `--skip-https` / `--no-nginx`；卸载 `--purge-all` 清库。
+可选：`--domain` / `--email`（默认 `admin@k2pay.com`）/ `--version` / `--skip-https` / `--no-nginx` / **`--cloudflare`**（经 Cloudflare 代理时生成 real_ip 并开启 `trust_cloudflare`）；卸载 `--purge-all` 清库。
 
 | 入口 | 地址 |
 |------|------|
@@ -45,6 +45,196 @@ sudo bash /tmp/k2pay-i.sh
 | 默认管理员 | `admin` / `admin123`（请立刻修改） |
 
 数据库密码见 `/etc/k2pay/db.credentials`。
+
+---
+
+## Cloudflare 接入指南（推荐公网部署）
+
+将支付域名挂在 **Cloudflare 橙云代理** 后，可获得 DDoS 防护、WAF、边缘限速，并隐藏源站 IP。  
+K2Pay **无需改对接协议**（签名 / pid / key / 路径不变）；必须正确还原 **真实客户端 IP**，否则 **商户 IP 白名单、全局 IP 黑名单、API 限流** 会失真。
+
+### 架构
+
+```
+商户服务器 / 用户浏览器
+        │
+        ▼
+  Cloudflare（橙云 Proxied）
+    · WAF / Bot / Rate Limit / TLS
+        │
+        ▼
+  源站 Nginx :80/:443
+    · real_ip（CF-Connecting-IP → 真实 IP）
+    · proxy_pass → 127.0.0.1:6088
+        │
+        ▼
+  K2Pay（security.trust_cloudflare + trusted_proxies）
+    · 白名单 / 黑名单 / 限流使用真实 IP
+```
+
+> 白名单校验在 **主程序** 内完成，**不会**动态改 Nginx 配置。Cloudflare 只是边缘防护 + 正确传 IP。
+
+### 方式 A：安装时一键开启（推荐）
+
+域名已在 Cloudflare 添加 DNS（A/AAAA 指向源站，代理状态为 **已代理 / 橙云**）：
+
+```bash
+# 安装并启用 Cloudflare 适配
+bash <(curl -fsSL https://raw.githubusercontent.com/HenZenKuriRIP/k2pay/main/scripts/install.sh) \
+  --domain pay.example.com \
+  --cloudflare
+```
+
+脚本会：
+
+1. 写入 `/etc/nginx/snippets/cloudflare-realip.conf`（从 Cloudflare 官方拉取 IP 段）  
+2. Nginx `include` 该片段，并透传 `CF-Connecting-IP`  
+3. `/etc/k2pay/config.yaml` 中设置：
+
+```yaml
+security:
+  trusted_proxies:
+    - "127.0.0.1"
+    - "::1"
+  trust_cloudflare: true
+```
+
+4. 应用仅监听 `127.0.0.1:6088`，由 Nginx 对外
+
+### 方式 B：已有部署后手工接入
+
+#### 1）Cloudflare 控制台
+
+| 项 | 建议值 |
+|----|--------|
+| DNS | 支付域名 A/AAAA → 源站公网 IP，**Proxied（橙云）** |
+| SSL/TLS | **Full (strict)** |
+| 源站证书 | Let’s Encrypt，或 [Origin Certificate](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/) |
+| 缓存 | `/api/*`、`/admin`、`/merchant`、`/cashier` **不缓存**（默认动态一般不缓存即可） |
+| WAF / Rate limiting | 建议对 `/api/pay/*` 加边缘限速，减轻撞库扫 pid |
+
+可选加强：
+
+- **Firewall Rules / WAF**：拦明显扫描  
+- **源站防火墙 / 安全组**：仅放行 [Cloudflare IP 段](https://www.cloudflare.com/ips/) 访问 80/443，禁止直连源站绕过 CF  
+- **不要**把应用端口 `6088` 暴露到公网  
+
+#### 2）源站 Nginx 还原真实 IP
+
+```bash
+# 生成 / 更新 Cloudflare IP 段（建议加入 cron 每月执行）
+sudo bash scripts/update-cloudflare-realip.sh
+# 默认输出: /etc/nginx/snippets/cloudflare-realip.conf
+```
+
+在支付站点的 `server { }` 中：
+
+```nginx
+include /etc/nginx/snippets/cloudflare-realip.conf;
+
+location / {
+    proxy_pass http://127.0.0.1:6088;
+    proxy_set_header Host              $host;
+    # real_ip 生效后 $remote_addr 已是访客/商户真实 IP
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header CF-Connecting-IP  $http_cf_connecting_ip;
+    proxy_http_version 1.1;
+    proxy_read_timeout 120s;
+}
+```
+
+完整示例见仓库：`deploy/nginx/k2pay-cloudflare.example.conf`。
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+#### 3）K2Pay 配置
+
+编辑 `/etc/k2pay/config.yaml`：
+
+```yaml
+security:
+  # 信任本机 Nginx；ClientIP 只从可信反代的头里取
+  trusted_proxies:
+    - "127.0.0.1"
+    - "::1"
+  # 启用后优先读取 CF-Connecting-IP（需 Nginx 透传）
+  trust_cloudflare: true
+```
+
+```bash
+sudo systemctl restart k2pay
+# 日志中应出现类似: Trusted proxies: [127.0.0.1 ::1] (Cloudflare CF-Connecting-IP enabled)
+```
+
+#### 4）验证真实 IP 是否正确
+
+1. 用手机流量或另一台机器访问管理后台，或让商户机调一次 `/api/pay/create`  
+2. 打开 **管理后台 → API 日志**，查看 **客户端 IP**  
+3. 应等于发起方 **公网出口 IP**，而 **不是** Cloudflare 任播节点 IP  
+
+若日志里全是 `104.x` / `172.64.x` 等 CF 段，说明 real_ip 或 `trust_cloudflare` 未生效，**先修好再开商户 IP 白名单**。
+
+### 对商户对接的影响
+
+| 项目 | 是否变化 |
+|------|----------|
+| 网关 URL | 仍为 `https://pay.example.com/api/pay/...`（你的域名） |
+| 签名算法 MD5、pid、key | **不变** |
+| 下单 / 查单 / 退款 / 回调字段 | **不变** |
+| K2Pay → 商户 `notify_url` | **不受影响**（出站回调，不经商户白名单） |
+| 商户 IP 白名单 | **仍填商户服务器真实出口 IP**（见下） |
+
+#### 商户侧也使用了 Cloudflare 时
+
+- 商户 **后端出站** 调 K2Pay 时，源 IP 一般是 **源站出口 IP**，不是 CF 节点 IP  
+- 白名单请在商户服务器执行 `curl -4 ifconfig.me` 取得出口 IP 后填入  
+- **不要**把「解析商户域名得到的 CF IP」当作白名单唯一来源  
+- 管理后台「域名解析加 IP」对橙云域名 **不可靠**，优先用固定出口 IP  
+
+### 定期维护
+
+```bash
+# 每月更新一次 Cloudflare IP 段（官方列表会变）
+sudo bash /path/to/k2pay/scripts/update-cloudflare-realip.sh
+```
+
+或 crontab：
+
+```cron
+0 3 1 * * root bash /usr/local/share/k2pay/scripts/update-cloudflare-realip.sh >/var/log/k2pay-cf-realip.log 2>&1
+```
+
+### 常见问题
+
+| 现象 | 原因与处理 |
+|------|------------|
+| 白名单已加服务器 IP 仍提示不在名单 | API 日志里 client IP 仍是 CF 节点 → 检查 Nginx `include cloudflare-realip`、`trust_cloudflare: true`、重启 k2pay |
+| 证书错误 / 526 | Cloudflare SSL 用 Full (strict)，源站证书无效 → 用有效 LE 或 Origin CA |
+| 能直连源站 IP 绕过 CF | 安全组未限制仅 CF IP 访问 80/443 |
+| 管理后台也被全世界扫 | 可用 CF Access、国家限制，或 Nginx 对 `/admin` 做 IP allow |
+| 回调（支付宝/微信）失败 | 回调 URL 必须用 **域名** 而非源站 IP；CF 代理下同样走域名即可 |
+
+### 安全配置项速查
+
+```yaml
+security:
+  trusted_proxies:     # 可信反代 CIDR/IP，空 = 不信任任何转发头
+    - "127.0.0.1"
+    - "::1"
+  trust_cloudflare: true   # 是否在可信反代场景下读取 CF-Connecting-IP
+```
+
+相关文件：
+
+| 文件 | 说明 |
+|------|------|
+| `scripts/update-cloudflare-realip.sh` | 拉取 CF IP 段生成 Nginx snippet |
+| `deploy/nginx/k2pay-cloudflare.example.conf` | 完整 Nginx 示例 |
+| `deploy/nginx/cloudflare-realip.conf` | snippet 说明占位 |
 
 ---
 
@@ -294,6 +484,8 @@ pid=...&key=...&money=1.00&out_trade_no=A001
 - [ ] 业务侧按 `out_trade_no` 幂等处理  
 - [ ] 用查单接口做对账兜底  
 - [ ] 测试环境先用小额/测试单走通全流程  
+- [ ] 若网关启用了 **商户 IP 白名单**：已填 **调 API 的服务器出口 IP**（上 Cloudflare 时见上文，勿填 CF 节点 IP）  
+- [ ] 若支付域名走 **Cloudflare**：API 日志中 client IP 已为真实出口 IP 后再开白名单  
 
 ### 11. 从旧易支付迁移
 

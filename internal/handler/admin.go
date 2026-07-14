@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/csv"
 	"encoding/hex"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -580,22 +582,114 @@ func (h *AdminHandler) UpdateMerchant(c *gin.Context) {
 	if req.Status != nil {
 		updates["status"] = *req.Status
 	}
-	// 白名单设置
+	// 白名单设置（规范化 + 校验）
+	ipList, err := util.NormalizeIPWhitelist(req.IPWhitelist)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "IP白名单格式错误: " + err.Error()})
+		return
+	}
+	domainList, err := util.NormalizeDomainWhitelist(req.RefererWhitelist)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "域名白名单格式错误: " + err.Error()})
+		return
+	}
+	ipEnabled := false
 	if req.IPWhitelistEnabled != nil {
-		updates["ip_whitelist_enabled"] = *req.IPWhitelistEnabled
+		ipEnabled = *req.IPWhitelistEnabled
+		updates["ip_whitelist_enabled"] = ipEnabled
+	} else {
+		// 未传开关时读库判断
+		var m model.Merchant
+		if model.GetDB().Select("ip_whitelist_enabled").First(&m, id).Error == nil {
+			ipEnabled = m.IPWhitelistEnabled
+		}
 	}
-	updates["ip_whitelist"] = req.IPWhitelist
+	if ipEnabled && ipList == "" {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "已启用IP白名单时至少填写一个IP或CIDR"})
+		return
+	}
+	refEnabled := false
 	if req.RefererWhitelistEnabled != nil {
-		updates["referer_whitelist_enabled"] = *req.RefererWhitelistEnabled
+		refEnabled = *req.RefererWhitelistEnabled
+		updates["referer_whitelist_enabled"] = refEnabled
+	} else {
+		var m model.Merchant
+		if model.GetDB().Select("referer_whitelist_enabled").First(&m, id).Error == nil {
+			refEnabled = m.RefererWhitelistEnabled
+		}
 	}
-	updates["referer_whitelist"] = req.RefererWhitelist
+	if refEnabled && domainList == "" {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "已启用Referer白名单时至少填写一个域名"})
+		return
+	}
+	updates["ip_whitelist"] = ipList
+	updates["referer_whitelist"] = domainList
 
 	if err := model.GetDB().Model(&model.Merchant{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "更新失败"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "success"})
+	c.JSON(http.StatusOK, gin.H{"code": 1, "msg": "success", "data": gin.H{
+		"ip_whitelist":      ipList,
+		"referer_whitelist": domainList,
+	}})
+}
+
+// ResolveHost 解析域名到 IP（对接商户时把业务站域名解析后加入 IP 白名单）
+func (h *AdminHandler) ResolveHost(c *gin.Context) {
+	var req struct {
+		Host string `json:"host" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "请填写域名，如 shop.example.com"})
+		return
+	}
+	host, err := util.ParseHostInput(req.Host)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": err.Error()})
+		return
+	}
+	// 若本身是 IP，直接返回
+	if ip := net.ParseIP(host); ip != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 1,
+			"data": gin.H{
+				"host": host,
+				"ips":  []string{ip.String()},
+			},
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "域名解析失败: " + err.Error()})
+		return
+	}
+	seen := make(map[string]struct{})
+	ips := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		s := a.IP.String()
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		ips = append(ips, s)
+	}
+	if len(ips) == 0 {
+		c.JSON(http.StatusOK, gin.H{"code": -1, "msg": "未解析到任何 IP"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"code": 1,
+		"data": gin.H{
+			"host": host,
+			"ips":  ips,
+		},
+	})
 }
 
 // DeleteMerchant 删除商户（软删除；系统商户与仍有余额的商户不可删）

@@ -642,11 +642,22 @@ func (h *EpayHandler) loadMerchant(pid string) (*model.Merchant, error) {
 }
 
 func (h *EpayHandler) checkMerchantAccess(c *gin.Context, merchant *model.Merchant) string {
-	if merchant.IPWhitelistEnabled && !middleware.CheckIPWhitelist(c.ClientIP(), merchant.IPWhitelist) {
-		return "IP不在白名单内"
+	// 启用后必须配置名单，避免“开启但为空=全放行”的误配置
+	if merchant.IPWhitelistEnabled {
+		if strings.TrimSpace(merchant.IPWhitelist) == "" {
+			return "IP白名单已启用但未配置任何IP"
+		}
+		if !middleware.CheckIPWhitelist(c.ClientIP(), merchant.IPWhitelist) {
+			return "IP不在白名单内"
+		}
 	}
-	if merchant.RefererWhitelistEnabled && !middleware.CheckRefererWhitelist(c.GetHeader("Referer"), merchant.RefererWhitelist) {
-		return "请求来源不在白名单内"
+	if merchant.RefererWhitelistEnabled {
+		if strings.TrimSpace(merchant.RefererWhitelist) == "" {
+			return "Referer白名单已启用但未配置任何域名"
+		}
+		if !middleware.CheckRefererWhitelist(c.GetHeader("Referer"), merchant.RefererWhitelist) {
+			return "请求来源不在白名单内"
+		}
 	}
 	return ""
 }

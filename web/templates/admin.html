@@ -203,6 +203,7 @@
             border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(15,23,42,.15);
         }
         .modal-content.modal-lg { width: 640px; }
+        .modal-content.modal-xl { width: 720px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
         .modal-header h3 { font-size: 16px; font-weight: 650; }
         .modal-close {
@@ -210,6 +211,63 @@
             font-size: 18px; cursor: pointer; color: var(--text-3); line-height: 1;
         }
         .modal-close:hover { background: #e2e8f0; color: var(--text); }
+
+        /* 白名单可视化编辑 */
+        .wl-panel {
+            background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+            padding: 14px 16px; margin-bottom: 14px;
+        }
+        .wl-panel-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            margin-bottom: 10px; flex-wrap: wrap;
+        }
+        .wl-panel-title { font-weight: 650; font-size: 14px; color: var(--text); }
+        .wl-panel-desc { font-size: 12px; color: var(--text-3); margin: 0 0 10px; line-height: 1.5; }
+        .wl-switch {
+            display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 550; color: var(--text-2); user-select: none;
+        }
+        .wl-switch input { width: 16px; height: 16px; margin: 0; }
+        .wl-tags {
+            display: flex; flex-wrap: wrap; gap: 8px; min-height: 36px;
+            padding: 10px; background: #fff; border: 1px solid var(--border);
+            border-radius: 10px; margin-bottom: 10px;
+        }
+        .wl-tags:empty::before {
+            content: attr(data-empty); color: #94a3b8; font-size: 12px; line-height: 36px;
+        }
+        .wl-tag {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
+            padding: 4px 8px 4px 10px; border-radius: 999px; font-size: 12.5px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500;
+        }
+        .wl-tag.domain {
+            background: #f0fdf4; color: #15803d; border-color: #bbf7d0;
+        }
+        .wl-tag button {
+            border: none; background: transparent; color: inherit; opacity: .55;
+            cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; border-radius: 4px;
+        }
+        .wl-tag button:hover { opacity: 1; background: rgba(0,0,0,.06); }
+        .wl-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .wl-row input[type="text"] {
+            flex: 1; min-width: 160px; padding: 10px 12px; border: 1px solid #ddd;
+            border-radius: 8px; font-size: 13px;
+        }
+        .wl-hint {
+            margin-top: 8px; font-size: 12px; color: #64748b; line-height: 1.5;
+            background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 10px;
+        }
+        .wl-resolve-result {
+            margin-top: 8px; font-size: 12px; color: #0369a1;
+        }
+        .wl-resolve-result .ip-pick {
+            display: inline-flex; align-items: center; gap: 4px; margin: 4px 6px 0 0;
+            padding: 3px 8px; border-radius: 6px; background: #e0f2fe; border: 1px solid #7dd3fc;
+            cursor: pointer; font-family: ui-monospace, monospace;
+        }
+        .wl-resolve-result .ip-pick:hover { background: #bae6fd; }
 
         /* Filter bar */
         .filter-bar {
@@ -588,6 +646,7 @@
                                     <th data-i18n="merchant.name">名称</th>
                                     <th data-i18n="merchant.balance">余额(USDT)</th>
                                     <th data-i18n="common.status">状态</th>
+                                    <th>API 白名单</th>
                                     <th data-i18n="merchant.createTime">创建时间</th>
                                     <th data-i18n="common.action">操作</th>
                                 </tr>
@@ -1138,7 +1197,7 @@
 
     <!-- Modal -->
     <div class="modal" id="modal">
-        <div class="modal-content">
+        <div class="modal-content" id="modalContent">
             <div class="modal-header">
                 <h3 id="modalTitle" data-i18n="adminPage.modal.title">标题</h3>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
@@ -1839,6 +1898,20 @@
             }
         }
 
+        function merchantWhitelistBadge(m) {
+            const ipOn = !!m.ip_whitelist_enabled;
+            const refOn = !!m.referer_whitelist_enabled;
+            const ipCount = (m.ip_whitelist || '').split(/[,;\s]+/).filter(Boolean).length;
+            const refCount = (m.referer_whitelist || '').split(/[,;\s]+/).filter(Boolean).length;
+            if (!ipOn && !refOn) {
+                return '<span class="badge badge-muted" title="未启用，任意公网 IP 可尝试调 API（仍需签名）">未启用</span>';
+            }
+            const parts = [];
+            if (ipOn) parts.push(`IP×${ipCount}`);
+            if (refOn) parts.push(`域名×${refCount}`);
+            return `<span class="badge badge-success" title="已限制 API 调用来源">${parts.join(' · ')}</span>`;
+        }
+
         async function loadMerchants() {
             const data = await api('/admin/api/merchants');
             if (data.code === 1) {
@@ -1853,13 +1926,15 @@
                         <td>
                             <span style="font-weight:600;color:#059669;">${(m.balance || 0).toFixed(2)}</span>
                             ${m.frozen_balance > 0 ? `<span style="color:#d97706;font-size:12px;margin-left:4px;">(冻结:${m.frozen_balance.toFixed(2)})</span>` : ''}
-                            <button class="btn btn-sm" style="margin-left:8px;padding:2px 6px;font-size:11px;" onclick="adjustBalance(${m.id}, '${m.name}', ${m.balance || 0})">调整</button>
+                            <button class="btn btn-sm" style="margin-left:8px;padding:2px 6px;font-size:11px;" onclick="adjustBalance(${m.id}, '${(m.name || '').replace(/'/g, "\\'")}', ${m.balance || 0})">调整</button>
                         </td>
                         <td>${m.status === 1 ? '<span class="badge badge-success">正常</span>' : '<span class="badge badge-danger">禁用</span>'}</td>
+                        <td>${merchantWhitelistBadge(m)}</td>
                         <td>${m.created_at}</td>
                         <td>
                             <div class="btn-group">
                                 <button class="btn btn-sm" onclick="showMerchantKey(${m.id})">密钥</button>
+                                <button class="btn btn-sm" style="background:#e0f2fe;color:#0369a1;" onclick="editMerchantWhitelist(${m.id})" title="配置 IP / 域名白名单">白名单</button>
                                 <button class="btn btn-sm btn-primary" onclick="editMerchant(${m.id})">编辑</button>
                                 <button class="btn btn-sm btn-danger" onclick="deleteMerchant(${m.id}, '${(m.name || m.pid || '').replace(/'/g, "\\'")}')">删除</button>
                             </div>
@@ -1977,17 +2052,288 @@
             }
         }
 
+        // ---- 白名单可视化编辑状态 ----
+        let wlState = { ips: [], domains: [] };
+
+        function parseList(raw) {
+            if (!raw) return [];
+            return String(raw).split(/[,;\s\n\r]+/).map(s => s.trim()).filter(Boolean);
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function setModalSize(size) {
+            const el = document.getElementById('modalContent');
+            if (!el) return;
+            el.classList.remove('modal-lg', 'modal-xl');
+            if (size === 'lg') el.classList.add('modal-lg');
+            if (size === 'xl') el.classList.add('modal-xl');
+        }
+
+        function openModal(title, bodyHtml, size) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = bodyHtml;
+            setModalSize(size || '');
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function renderWlTags(kind) {
+            const isIP = kind === 'ip';
+            const list = isIP ? wlState.ips : wlState.domains;
+            const box = document.getElementById(isIP ? 'wlIpTags' : 'wlDomainTags');
+            if (!box) return;
+            if (!list.length) {
+                box.innerHTML = '';
+                return;
+            }
+            box.innerHTML = list.map((item, i) => `
+                <span class="wl-tag ${isIP ? '' : 'domain'}">
+                    ${escapeHtml(item)}
+                    <button type="button" title="移除" onclick="removeWlItem('${kind}', ${i})">&times;</button>
+                </span>
+            `).join('');
+        }
+
+        function removeWlItem(kind, index) {
+            if (kind === 'ip') {
+                wlState.ips.splice(index, 1);
+                renderWlTags('ip');
+            } else {
+                wlState.domains.splice(index, 1);
+                renderWlTags('domain');
+            }
+        }
+
+        function addWlIP() {
+            const input = document.getElementById('wlIpInput');
+            if (!input) return;
+            const raw = (input.value || '').trim();
+            if (!raw) return;
+            // 支持一次粘贴多个
+            const items = parseList(raw);
+            let added = 0;
+            for (const item of items) {
+                if (!wlState.ips.includes(item)) {
+                    wlState.ips.push(item);
+                    added++;
+                }
+            }
+            if (added === 0) {
+                showToast && showToast('已在列表中');
+            }
+            input.value = '';
+            renderWlTags('ip');
+        }
+
+        function addWlDomain() {
+            const input = document.getElementById('wlDomainInput');
+            if (!input) return;
+            let raw = (input.value || '').trim();
+            if (!raw) return;
+            const items = parseList(raw).map(d => {
+                d = d.replace(/^https?:\/\//i, '');
+                const slash = d.indexOf('/');
+                if (slash >= 0) d = d.slice(0, slash);
+                return d.trim().toLowerCase();
+            }).filter(Boolean);
+            for (const item of items) {
+                if (!wlState.domains.includes(item)) wlState.domains.push(item);
+            }
+            input.value = '';
+            renderWlTags('domain');
+        }
+
+        async function resolveDomainToIP() {
+            const input = document.getElementById('wlDomainResolve');
+            const result = document.getElementById('wlResolveResult');
+            if (!input || !result) return;
+            const host = (input.value || '').trim();
+            if (!host) {
+                alert('请输入商户业务站域名，例如 shop.example.com');
+                return;
+            }
+            result.innerHTML = '解析中…';
+            const data = await api('/admin/api/tools/resolve-host', {
+                method: 'POST',
+                body: JSON.stringify({ host })
+            });
+            if (data.code !== 1) {
+                result.innerHTML = '<span style="color:#b91c1c;">' + escapeHtml(data.msg || '解析失败') + '</span>';
+                return;
+            }
+            const ips = (data.data && data.data.ips) || [];
+            const resolvedHost = (data.data && data.data.host) || host;
+            if (!ips.length) {
+                result.innerHTML = '未解析到 IP';
+                return;
+            }
+            window._lastResolvedIPs = ips;
+            result.innerHTML = `
+                <div>域名 <strong>${escapeHtml(resolvedHost)}</strong> 解析到（点击加入 IP 白名单）：</div>
+                <div style="margin-top:4px;">
+                    ${ips.map(ip => `<span class="ip-pick" onclick="pickResolvedIP(this.dataset.ip)" data-ip="${escapeHtml(ip)}">${escapeHtml(ip)} ＋</span>`).join('')}
+                    <button type="button" class="btn btn-sm btn-primary" style="margin-left:4px;" onclick="pickAllResolvedIPs()">全部加入</button>
+                </div>
+                <div style="margin-top:6px;color:#64748b;">注意：CDN/动态解析 IP 可能变化，优先使用商户服务器固定出口 IP。</div>
+            `;
+        }
+
+        function pickResolvedIP(ip) {
+            if (!ip) return;
+            if (!wlState.ips.includes(ip)) {
+                wlState.ips.push(ip);
+                renderWlTags('ip');
+            }
+            const cb = document.getElementById('editIPWhitelistEnabled');
+            if (cb) cb.checked = true;
+            if (typeof showToast === 'function') showToast('已加入: ' + ip);
+        }
+
+        function pickAllResolvedIPs() {
+            const ips = window._lastResolvedIPs || [];
+            if (!Array.isArray(ips) || !ips.length) return;
+            ips.forEach(ip => {
+                if (ip && !wlState.ips.includes(ip)) wlState.ips.push(ip);
+            });
+            renderWlTags('ip');
+            const cb = document.getElementById('editIPWhitelistEnabled');
+            if (cb) cb.checked = true;
+            if (typeof showToast === 'function') showToast('已加入 ' + ips.length + ' 个 IP');
+        }
+
+        function buildWhitelistPanelsHTML(m) {
+            return `
+                <div class="wl-panel">
+                    <div class="wl-panel-head">
+                        <span class="wl-panel-title"><i class="fas fa-shield-alt"></i> IP 白名单</span>
+                        <label class="wl-switch">
+                            <input type="checkbox" id="editIPWhitelistEnabled" ${m.ip_whitelist_enabled ? 'checked' : ''}>
+                            <span>启用后仅名单内 IP 可调支付 API</span>
+                        </label>
+                    </div>
+                    <p class="wl-panel-desc">对接时填写<strong>商户业务服务器出口 IP</strong>（调用 /api/pay/* 的机器），支持单个 IP 或 CIDR（如 10.0.0.0/24）。</p>
+                    <div class="wl-tags" id="wlIpTags" data-empty="暂无 IP，请在下方添加或通过域名解析加入"></div>
+                    <div class="wl-row">
+                        <input type="text" id="wlIpInput" placeholder="例如 203.0.113.10 或 203.0.113.0/24" onkeydown="if(event.key==='Enter'){event.preventDefault();addWlIP();}">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addWlIP()">添加 IP</button>
+                    </div>
+                    <div style="margin-top:12px;padding-top:12px;border-top:1px dashed #e2e8f0;">
+                        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:6px;">从域名解析 IP（对接商户网站时）</div>
+                        <div class="wl-row">
+                            <input type="text" id="wlDomainResolve" placeholder="shop.example.com 或 https://shop.example.com" onkeydown="if(event.key==='Enter'){event.preventDefault();resolveDomainToIP();}">
+                            <button type="button" class="btn btn-sm" style="background:#e0f2fe;color:#0369a1;" onclick="resolveDomainToIP()">解析并选择</button>
+                        </div>
+                        <div class="wl-resolve-result" id="wlResolveResult"></div>
+                    </div>
+                    <div class="wl-hint">启用后名单不能为空。签名校验仍有效；白名单只限制「谁可以连」，key 仍不能泄露。</div>
+                </div>
+                <div class="wl-panel">
+                    <div class="wl-panel-head">
+                        <span class="wl-panel-title"><i class="fas fa-globe"></i> Referer 域名白名单</span>
+                        <label class="wl-switch">
+                            <input type="checkbox" id="editRefererWhitelistEnabled" ${m.referer_whitelist_enabled ? 'checked' : ''}>
+                            <span>限制浏览器来源域名（可选）</span>
+                        </label>
+                    </div>
+                    <p class="wl-panel-desc">适用于页面跳转下单（/api/pay/submit）。服务端 JSON 下单通常无 Referer，可不启用。支持 <code>*.example.com</code>。</p>
+                    <div class="wl-tags" id="wlDomainTags" data-empty="暂无域名"></div>
+                    <div class="wl-row">
+                        <input type="text" id="wlDomainInput" placeholder="例如 shop.example.com 或 *.example.com" onkeydown="if(event.key==='Enter'){event.preventDefault();addWlDomain();}">
+                        <button type="button" class="btn btn-sm" style="background:#dcfce7;color:#166534;" onclick="addWlDomain()">添加域名</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function initWhitelistEditor(m) {
+            wlState = {
+                ips: parseList(m.ip_whitelist),
+                domains: parseList(m.referer_whitelist)
+            };
+            renderWlTags('ip');
+            renderWlTags('domain');
+        }
+
+        function collectWhitelistPayload() {
+            return {
+                ip_whitelist_enabled: !!(document.getElementById('editIPWhitelistEnabled') || {}).checked,
+                ip_whitelist: wlState.ips.join(','),
+                referer_whitelist_enabled: !!(document.getElementById('editRefererWhitelistEnabled') || {}).checked,
+                referer_whitelist: wlState.domains.join(',')
+            };
+        }
+
+        /** 仅编辑白名单（对接商户时快速配置） */
+        function editMerchantWhitelist(id) {
+            const m = merchantsData[id] || {};
+            openModal('API 白名单 — ' + (m.name || m.pid || id), `
+                <p style="margin:0 0 14px;font-size:13px;color:#64748b;line-height:1.55;">
+                    商户 <strong>${escapeHtml(m.name || '')}</strong>（PID: <code>${escapeHtml(m.pid || '')}</code>）
+                    对接时把对方服务器 IP 加入名单并启用，可显著减少撞库与盗用风险。
+                </p>
+                ${buildWhitelistPanelsHTML(m)}
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+                    <button type="button" class="btn" onclick="closeModal()">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveMerchantWhitelist(${id})">保存白名单</button>
+                </div>
+            `, 'xl');
+            initWhitelistEditor(m);
+        }
+
+        async function saveMerchantWhitelist(id) {
+            const m = merchantsData[id] || {};
+            const wl = collectWhitelistPayload();
+            if (wl.ip_whitelist_enabled && !wl.ip_whitelist) {
+                alert('已启用 IP 白名单时，请至少添加一个 IP');
+                return;
+            }
+            if (wl.referer_whitelist_enabled && !wl.referer_whitelist) {
+                alert('已启用 Referer 白名单时，请至少添加一个域名');
+                return;
+            }
+            // 保留名称等字段一并提交，避免后端把空 name 逻辑误伤（仅更新白名单相关）
+            const updateData = {
+                name: m.name || '',
+                email: m.email || '',
+                wallet_limit: m.wallet_limit || 0,
+                status: m.status,
+                ...wl
+            };
+            const data = await api('/admin/api/merchants/' + id, {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
+            if (data.code === 1) {
+                if (data.data) {
+                    m.ip_whitelist = data.data.ip_whitelist;
+                    m.referer_whitelist = data.data.referer_whitelist;
+                } else {
+                    m.ip_whitelist = wl.ip_whitelist;
+                    m.referer_whitelist = wl.referer_whitelist;
+                }
+                m.ip_whitelist_enabled = wl.ip_whitelist_enabled;
+                m.referer_whitelist_enabled = wl.referer_whitelist_enabled;
+                merchantsData[id] = m;
+                closeModal();
+                loadMerchants();
+                showToast && showToast('白名单已保存');
+            } else {
+                alert(data.msg || '保存失败');
+            }
+        }
+
         function editMerchant(id) {
             const m = merchantsData[id] || {};
-            document.getElementById('modalTitle').textContent = '编辑商户';
-            document.getElementById('modalBody').innerHTML = `
+            openModal('编辑商户', `
                 <div class="form-group">
                     <label>商户名称</label>
-                    <input type="text" id="editMerchantName" value="${m.name || ''}" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;">
+                    <input type="text" id="editMerchantName" value="${escapeHtml(m.name || '')}" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;">
                 </div>
                 <div class="form-group">
                     <label>联系邮箱</label>
-                    <input type="email" id="editMerchantEmail" value="${m.email || ''}" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;">
+                    <input type="email" id="editMerchantEmail" value="${escapeHtml(m.email || '')}" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;">
                 </div>
                 <div class="form-group">
                     <label>重置密码 (留空不修改)</label>
@@ -2004,39 +2350,30 @@
                         <option value="0" ${m.status === 0 ? 'selected' : ''}>禁用</option>
                     </select>
                 </div>
-                <hr style="margin:20px 0;border:none;border-top:1px solid #eee;">
-                <h4 style="margin-bottom:16px;color:#666;">白名单设置</h4>
-                <div class="form-group">
-                    <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
-                        <input type="checkbox" id="editIPWhitelistEnabled" ${m.ip_whitelist_enabled ? 'checked' : ''} style="margin:0;width:16px;height:16px;">
-                        <span>启用IP白名单</span>
-                    </label>
-                    <input type="text" id="editIPWhitelist" value="${m.ip_whitelist || ''}" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;margin-top:8px;" placeholder="IP地址，多个用逗号分隔，如: 192.168.1.1,10.0.0.0/24">
-                    <small style="color:#999;display:block;margin-top:4px;">仅允许白名单中的IP调用API</small>
-                </div>
-                <div class="form-group">
-                    <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
-                        <input type="checkbox" id="editRefererWhitelistEnabled" ${m.referer_whitelist_enabled ? 'checked' : ''} style="margin:0;width:16px;height:16px;">
-                        <span>启用Referer白名单</span>
-                    </label>
-                    <input type="text" id="editRefererWhitelist" value="${m.referer_whitelist || ''}" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;margin-top:8px;" placeholder="域名，多个用逗号分隔，如: example.com,*.test.com">
-                    <small style="color:#999;display:block;margin-top:4px;">仅允许白名单中的域名来源调用API</small>
-                </div>
+                <hr style="margin:18px 0;border:none;border-top:1px solid #eee;">
+                <h4 style="margin:0 0 12px;color:#334155;font-size:14px;">API 访问白名单</h4>
+                ${buildWhitelistPanelsHTML(m)}
                 <button class="btn btn-primary" onclick="updateMerchant(${id})">保存修改</button>
-            `;
-            document.getElementById('modal').classList.add('show');
+            `, 'xl');
+            initWhitelistEditor(m);
         }
 
         async function updateMerchant(id) {
+            const wl = collectWhitelistPayload();
+            if (wl.ip_whitelist_enabled && !wl.ip_whitelist) {
+                alert('已启用 IP 白名单时，请至少添加一个 IP');
+                return;
+            }
+            if (wl.referer_whitelist_enabled && !wl.referer_whitelist) {
+                alert('已启用 Referer 白名单时，请至少添加一个域名');
+                return;
+            }
             const updateData = {
                 name: document.getElementById('editMerchantName').value,
                 email: document.getElementById('editMerchantEmail').value,
                 wallet_limit: parseInt(document.getElementById('editMerchantWalletLimit').value) || 0,
                 status: parseInt(document.getElementById('editMerchantStatus').value),
-                ip_whitelist_enabled: document.getElementById('editIPWhitelistEnabled').checked,
-                ip_whitelist: document.getElementById('editIPWhitelist').value,
-                referer_whitelist_enabled: document.getElementById('editRefererWhitelistEnabled').checked,
-                referer_whitelist: document.getElementById('editRefererWhitelist').value
+                ...wl
             };
             const password = document.getElementById('editMerchantPassword').value;
             if (password) {
@@ -2656,8 +2993,7 @@
 
         function closeModal() {
             document.getElementById('modal').classList.remove('show');
-            const mc = document.querySelector('#modal .modal-content');
-            if (mc) mc.classList.remove('modal-lg');
+            setModalSize('');
         }
 
         // Chain management
